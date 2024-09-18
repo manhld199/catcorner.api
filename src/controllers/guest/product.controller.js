@@ -1,5 +1,5 @@
-import Product from "../../models/product.model";
-import { ok } from "../../handlers/respone.handler";
+import Product from "../../models/product.model.js";
+import { ok } from "../../handlers/respone.handler.js";
 
 // [GET] / api/guest/products/getProducts
 export const getProducts = async (req, res, next) => {

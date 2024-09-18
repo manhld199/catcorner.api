@@ -1,11 +1,9 @@
-import express from "express";
+import adminRouter from "./admin/index.js";
+import guestRouter from "./guest/index.js";
 
-const router = express.Router();
+const route = (app) => {
+  app.use("/api/admin", adminRouter);
+  app.use("/api/guest", guestRouter);
+};
 
-const adminRouter = require("./admin");
-const guestRouter = require("./guest");
-
-router.use("/admin", adminRouter);
-router.use("/guest", guestRouter);
-
-export default router;
+export default route;

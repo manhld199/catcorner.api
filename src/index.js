@@ -2,16 +2,15 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-import path from "path";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
+import route from "./routes/index.js";
 
 const PORT = 8080;
-const __dirname = path.resolve();
 dotenv.config();
 
 mongoose
-  .connect(process.env.MONGODB_CONNECTION_STRING, mongooseOptions)
+  .connect(process.env.MONGODB_CONNECTION_STRING)
   .then(() => {
     console.log("Connected to MongoDB");
   })
@@ -30,7 +29,7 @@ app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
 
-// routes here
+route(app);
 
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
