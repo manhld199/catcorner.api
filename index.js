@@ -1,10 +1,9 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import cors from "cors";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
-import route from "./routes/index.js";
+import route from "./src/routes/index.js";
 
 const PORT = 8080;
 dotenv.config();
