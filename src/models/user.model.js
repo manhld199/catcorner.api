@@ -5,6 +5,10 @@ const userSchema = new mongoose.Schema(
     user_email: { type: String, required: true },
     user_name: { type: String, required: true },
     user_password: { type: String, required: true },
+    is_email_verified: {
+      type: Boolean,
+      default: false,
+    },
     user_phone_number: { type: String },
     user_avt: { type: String },
     user_sex: { type: String },
