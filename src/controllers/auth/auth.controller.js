@@ -111,3 +111,58 @@ export const checkEmail = async (req, res) => {
     return error(res, { message: "Internal server error" }, 500);
   }
 };
+// [POST] /api/auth/login
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Kiểm tra email
+    const user = await User.findOne({ user_email: email });
+    if (!user) {
+      return badRequest(res, "Invalid email or password");
+    }
+
+    // Kiểm tra password
+    const isValidPassword = await argon2.verify(user.user_password, password);
+    if (!isValidPassword) {
+      return badRequest(res, "Invalid email or password");
+    }
+    // Kiểm tra xác thực tài khoản
+    if (!user.is_email_verified) {
+      return badRequest(res, "Please verify your email before logging in");
+    }
+    // Tạo JWT token
+    const token = jwt.sign(
+      {
+        user_id: user._id,
+        name: user.user_name,
+        user_roles: user.user_role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Tạo refresh token
+    const refreshToken = jwt.sign({ user_id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: "7d",
+    });
+
+    // Lưu refresh token vào database ( để quản lý và thu hồi)
+    user.refresh_token = refreshToken;
+    await user.save();
+
+    return ok(res, {
+      token,
+      user: {
+        id: user._id,
+        name: user.user_name,
+        email: user.user_email,
+        role: user.user_role,
+      },
+      expiresIn: 3600, // 1 giờ
+      refreshToken,
+    });
+  } catch (err) {
+    return error(res, { message: "Internal server error" }, 500);
+  }
+};
