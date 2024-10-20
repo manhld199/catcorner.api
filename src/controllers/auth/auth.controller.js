@@ -5,7 +5,7 @@ import argon2 from "argon2";
 import { ok, error, badRequest } from "../../handlers/respone.handler.js";
 import { USER_ROLES } from "../../utils/constants/index.js";
 import User from "../../models/user.model.js";
-
+import { sendVerificationEmail } from "../../utils/functions/emailService.js";
 // [POST] /api/auth/register
 export const register = async (req, res, next) => {
   try {
@@ -34,32 +34,14 @@ export const register = async (req, res, next) => {
 
     // Create a verification token
     const token = jwt.sign({ userId: newUser._id }, process.env.JWT_SECRET, {
-      expiresIn: "1h",
+      expiresIn: "10m",
     });
 
     // Create a verification link
     const verificationLink = `${process.env.BASE_URL}/api/auth/verify-email?token=${token}`;
 
     // Send verification email
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Verify your email",
-      text: `Please verify your email by clicking the following link: ${verificationLink}`,
-    };
-
-    await transporter.sendMail(mailOptions);
+    await sendVerificationEmail(email, verificationLink);
 
     return ok(res, { message: "User registered. Please check your email to verify your account." });
   } catch (err) {
@@ -105,5 +87,27 @@ export const verifyEmail = async (req, res) => {
     }
     console.log("Err: " + err);
     return error(res, "Internal server error");
+  }
+};
+// [GET] /api/auth/check-email
+export const checkEmail = async (req, res) => {
+  try {
+    let { email } = req.query;
+
+    if (!email) {
+      return badRequest(res, "Email is required");
+    }
+    email = email.trim();
+
+    const existingUser = await User.findOne({ user_email: email });
+
+    if (existingUser) {
+      return ok(res, { exists: true, message: "Email is already registered" });
+    } else {
+      return ok(res, { exists: false, message: "Email is available" });
+    }
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res, { message: "Internal server error" }, 500);
   }
 };

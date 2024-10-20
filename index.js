@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
 import route from "./src/routes/index.js";
+import cors from "cors";
 
 const PORT = 8080;
 dotenv.config();
@@ -18,6 +19,8 @@ mongoose
   });
 
 const app = express();
+// Add this line to enable CORS
+app.use(cors());
 
 app.use(express.json());
 app.use(cookieParser());
