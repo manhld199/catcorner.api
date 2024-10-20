@@ -77,7 +77,7 @@ export const verifyEmail = async (req, res) => {
     user.is_email_verified = true;
     await user.save();
     // return res.redirect("/login?message=Email verified successfully. Please log in.");
-    return res.redirect("https://www.forcatshop.com/login");
+    return res.redirect(process.env.FE_URL + "/login");
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       return res.redirect("/error?message=Verification link has expired&action=resend");
