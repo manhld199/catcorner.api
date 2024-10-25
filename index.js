@@ -20,6 +20,8 @@ mongoose
   });
 
 const app = express();
+// Add this line to enable CORS
+app.use(cors());
 
 app.use(cors());
 app.use(express.json());
