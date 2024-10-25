@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import bodyParser from "body-parser";
+import cors from "cors";
+
 import route from "./src/routes/index.js";
 
 const PORT = 8080;
@@ -19,6 +21,7 @@ mongoose
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({ extended: true }));

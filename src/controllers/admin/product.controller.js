@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
 
 import Product from "../../models/product.model.js";
-import { notFound, ok } from "../../handlers/respone.handler.js";
+import { notFound, ok, error, badRequest, created } from "../../handlers/respone.handler.js";
+import { createSlug } from "../../utils/functions/format.js";
 
-// [GET] / api/admin/products
+// [GET] /api/admin/products
 export const getProducts = async (req, res, next) => {
   try {
     const products = await Product.aggregate([
@@ -38,8 +39,10 @@ export const getProducts = async (req, res, next) => {
             rating_point: "$product_rating.rating_point", // Lấy điểm rating
             rating_count: "$product_rating.rating_count", // Lấy số lượt rating
           },
+          createdAt: 1,
         },
       },
+      { $sort: { createdAt: -1 } },
     ]);
 
     // console.log("products: ", products);
@@ -49,10 +52,11 @@ export const getProducts = async (req, res, next) => {
     return ok(res, { products: products });
   } catch (err) {
     console.log("Err: " + err);
+    return error(res, err.message);
   }
 };
 
-// [GET] / api/admin/products/{id}
+// [GET] /api/admin/products/{id}
 export const getProduct = async (req, res, next) => {
   try {
     const id = req.params.id;
@@ -70,5 +74,60 @@ export const getProduct = async (req, res, next) => {
     return ok(res, { product: products[0] });
   } catch (err) {
     console.log("Err: " + err);
+    return error(res, err.message);
+  }
+};
+
+// [POST] /api/admin/products
+export const postProduct = async (req, res, next) => {
+  try {
+    const product = req.body;
+
+    const addProduct = {
+      ...product,
+      product_slug: createSlug(product.product_name),
+      product_variants: product.product_variants.map((variant) => ({
+        ...variant,
+        variant_slug: createSlug(variant.variant_name),
+      })),
+    };
+
+    // console.log("aaaaaaaaaaaa", addProduct);
+
+    const newProduct = new Product(addProduct);
+
+    const savedProduct = newProduct.save();
+
+    if (!savedProduct) return badRequest(res, {});
+    return created(res, { id: savedProduct._id }, {});
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res);
+  }
+};
+
+// [PUT] /api/admin/products/{id}
+export const putProduct = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+    const objectId = new mongoose.Types.ObjectId(id);
+    const product = req.body;
+
+    const updateProduct = {
+      ...product,
+      product_slug: createSlug(product.product_name),
+      product_variants: product.product_variants.map((variant) => ({
+        ...variant,
+        variant_slug: createSlug(variant.variant_name),
+      })),
+    };
+
+    const putProduct = await Product.findOneAndUpdate({ _id: objectId }, updateProduct);
+
+    if (!putProduct) return notFound(res, {});
+    return ok(res, {});
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res);
   }
 };
