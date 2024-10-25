@@ -23,14 +23,16 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    product_specifications: {
-      name: {
-        type: String,
+    product_specifications: [
+      {
+        name: {
+          type: String,
+        },
+        value: {
+          type: String,
+        },
       },
-      value: {
-        type: String,
-      },
-    },
+    ],
     category_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
