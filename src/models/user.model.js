@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const userSchema = new mongoose.Schema(
   {
     user_email: { type: String, required: false },
-    facebookId: { type: String, unique: true },
+    facebook_id: { type: String, required: false },
     user_name: { type: String, required: true },
     user_password: { type: String, required: true },
     is_email_verified: {

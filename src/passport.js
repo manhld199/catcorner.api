@@ -51,7 +51,7 @@ passport.use(new FacebookStrategy({
         profile.name.familyName    
       ].filter(Boolean).join(' '); 
       user = new User({
-        facebookId: profile.id,
+        facebook_id: profile.id,
         user_name: fullName,
         user_password: 'facebook-auth', // You might want to handle this differently
         user_email: profile.emails ? profile.emails[0].value : undefined,
