@@ -40,16 +40,19 @@ passport.use(new FacebookStrategy({
   profileFields: ['id', 'emails', 'name']
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    let user = await User.findOne({ user_email: profile.emails[0].value });
+    // Step 1: Check if the user already exists in the database by facebookId
+    let user = await User.findOne({ facebookId: profile.id });
+        
+    // Step 2: If user doesn't exist, create a new one
     if (!user) {
       user = new User({
-        user_email: profile.emails[0].value,
-        user_name: `${profile.name.givenName} ${profile.name.familyName}`,
+        facebookId: profile.id,
+        user_name: profile.displayName,
         user_password: 'facebook-auth', // You might want to handle this differently
+        user_email: profile.emails ? profile.emails[0].value : undefined,
         is_email_verified: true,
         user_role: 'USER'
       });
-      await user.save();
     }
     const token = generateToken(user);
     const refreshToken = generateRefreshToken(user);
