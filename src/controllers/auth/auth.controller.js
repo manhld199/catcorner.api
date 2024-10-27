@@ -1,11 +1,12 @@
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import argon2 from "argon2";
 
 import { ok, error, badRequest } from "../../handlers/respone.handler.js";
 import { USER_ROLES } from "../../utils/constants/index.js";
 import User from "../../models/user.model.js";
 import { sendVerificationEmail } from "../../utils/functions/emailService.js";
+import passport from '../../passport.js';
+
 // [POST] /api/auth/register
 export const register = async (req, res, next) => {
   try {
@@ -165,4 +166,42 @@ export const login = async (req, res) => {
   } catch (err) {
     return error(res, { message: "Internal server error" }, 500);
   }
+};
+
+
+// login with gg, fb
+
+export const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'] });
+
+export const googleAuthCallback = (req, res, next) => {
+  passport.authenticate('google', { session: false }, (err, data) => {
+    if (err) {
+      return next(err);
+    }
+    if (!data) {
+      return badRequest(res, "Google authentication failed");
+    }
+    
+    const { token, user } = data;
+
+    // Redirect with token and name
+    res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
+
+  })(req, res, next);
+};
+export const facebookAuth = passport.authenticate('facebook', { scope: ['email'] });
+
+export const facebookAuthCallback = (req, res, next) => {
+  passport.authenticate('facebook', { session: false }, (err, data) => {
+    if (err) {
+      return next(err);
+    }
+    if (!data) {
+      return badRequest(res, "Facebook authentication failed");
+    }
+    const { token, user } = data;
+    // Redirect with token and name
+    res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
+
+  })(req, res, next);
 };
