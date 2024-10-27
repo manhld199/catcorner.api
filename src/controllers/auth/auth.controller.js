@@ -197,7 +197,7 @@ export const facebookAuthCallback = (req, res, next) => {
       return next(err);
     }
     if (!data) {
-      return badRequest(res, "Facebook authentication failed");
+      res.redirect(`${process.env.FE_URL}/login`);
     }
     const { token, user } = data;
     // Redirect with token and name
