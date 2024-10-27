@@ -181,16 +181,12 @@ export const googleAuthCallback = (req, res, next) => {
     if (!data) {
       return badRequest(res, "Google authentication failed");
     }
-    return ok(res, {
-      token: data.token,
-      user: {
-        id: data.user._id,
-        name: data.user.user_name,
-        email: data.user.user_email,
-        role: data.user.user_role,
-      },
-      expiresIn: 3600, // 1 giờ
-    });
+    
+    const { token, user } = data;
+
+    // Redirect with token and name
+    res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
+
   })(req, res, next);
 };
 export const facebookAuth = passport.authenticate('facebook', { scope: ['email'] });
@@ -203,15 +199,9 @@ export const facebookAuthCallback = (req, res, next) => {
     if (!data) {
       return badRequest(res, "Facebook authentication failed");
     }
-    return ok(res, {
-      token: data.token,
-      user: {
-        id: data.user._id,
-        name: data.user.user_name,
-        email: data.user.user_email,
-        role: data.user.user_role,
-      },
-      expiresIn: 3600, // 1 giờ
-    });
+    const { token, user } = data;
+    // Redirect with token and name
+    res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
+
   })(req, res, next);
 };
