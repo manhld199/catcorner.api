@@ -42,7 +42,7 @@ passport.use(new FacebookStrategy({
   try {
     // Step 1: Check if the user already exists in the database by facebookId
     let user = await User.findOne({ facebookId: profile.id });
-        
+    console.log(profile);    
     // Step 2: If user doesn't exist, create a new one
     if (!user) {
       user = new User({
