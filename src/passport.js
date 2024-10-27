@@ -41,14 +41,14 @@ passport.use(new FacebookStrategy({
 }, async (accessToken, refreshToken, profile, done) => {
   try {
     // Step 1: Check if the user already exists in the database by facebookId
-    let user = await User.findOne({ facebookId: profile.id });
+    let user = await User.findOne({ facebook_id: profile.id });
     
     // Step 2: If user doesn't exist, create a new one
     if (!user) {
       const fullName = [
-        profile.name.givenName,    
+        profile.name.familyName,    
         profile.name.middleName,  
-        profile.name.familyName    
+        profile.name.givenName    
       ].filter(Boolean).join(' '); 
       user = new User({
         facebook_id: profile.id,
