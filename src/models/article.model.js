@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const articleSchema = new mongoose.Schema(
   {
-    user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    user_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // tam thoi xoa required
     article_name: { type: String, required: true },
     article_slug: { type: String, required: true },
     article_avt: { type: String, required: true },

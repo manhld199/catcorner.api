@@ -1,5 +1,7 @@
 // format functions are used for format value. Ex: 1000 -> 1.000 vnd
 const createSlug = (string) => {
+  if (typeof string != "string") return "";
+
   const a = "àáäâãåăæąçćčđďèéěėëêęğǵḧìíïîįłḿǹńňñòóöôœøṕŕřßşśšșťțùúüûǘůűūųẃẍÿýźžż·/_,:;";
   const b = "aaaaaaaaacccddeeeeeeegghiiiiilmnnnnooooooprrsssssttuuuuuuuuuwxyyzzz------";
   const p = new RegExp(a.split("").join("|"), "g");
