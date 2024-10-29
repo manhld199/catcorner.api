@@ -116,10 +116,9 @@ export const checkEmail = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Kiểm tra email
     const user = await User.findOne({ user_email: email });
-    if (!user) {
+    // user not found hoặc là tài khoản gg or fb 
+    if (!user || ( user.user_password == 'google-auth' || user.user_password == 'facebook-auth')) {
       return badRequest(res, "Invalid email or password");
     }
 
@@ -164,6 +163,7 @@ export const login = async (req, res) => {
       refreshToken,
     });
   } catch (err) {
+    console.log(err)
     return error(res, { message: "Internal server error" }, 500);
   }
 };
