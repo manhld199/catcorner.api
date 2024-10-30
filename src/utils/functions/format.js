@@ -1,3 +1,5 @@
+import { JSDOM } from "jsdom";
+
 // format functions are used for format value. Ex: 1000 -> 1.000 vnd
 export const createSlug = (string) => {
   if (typeof string != "string") return "";
@@ -41,4 +43,10 @@ export const getCldPublicIdFromUrl = (url) => {
     console.error(">> Error in getCldPublicIdFromUrl:", error.message);
     return undefined;
   }
+};
+
+export const extractImageLinksFromHTML = (htmlString) => {
+  const dom = new JSDOM(htmlString);
+  const document = dom.window.document;
+  return Array.from(document.querySelectorAll("img")).map((img) => img.src);
 };

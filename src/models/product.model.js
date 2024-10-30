@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-import { getCldPublicIdFromUrl } from "../utils/functions/format.js";
+import { getCldPublicIdFromUrl, extractImageLinksFromHTML } from "../utils/functions/format.js";
 import cloudinary from "../libs/cloudinary.js";
 
 const productSchema = new mongoose.Schema(
@@ -121,20 +121,21 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Pre-hook to delete Cloudinary resources when deleting products
 productSchema.pre("deleteMany", async function (next) {
-  // Lấy danh sách các sản phẩm dựa trên truy vấn sẽ xóa
+  // Get the list of products based on the delete query
   const products = await this.model.find(this.getQuery());
 
-  // Lấy danh sách publicIds từ product_imgs và product_variants.variant_img
+  // Collect public IDs from product_imgs, product_variants, and product_description
   const publicIds = products.flatMap((product) => [
-    // Lấy các publicIds từ product_imgs
+    // Collect public IDs from product_imgs if they are Cloudinary URLs
     ...product.product_imgs
       .filter(
         (url) => url.startsWith("https://res.cloudinary.com/") || url.startsWith("SEO_Images")
       )
       .map((url) => getCldPublicIdFromUrl(url)),
 
-    // Lấy các publicIds từ product_variants.variant_img
+    // Collect public IDs from product_variants.variant_img if they are Cloudinary URLs
     ...product.product_variants.flatMap((variant) =>
       variant.variant_img &&
       (variant.variant_img.startsWith("https://res.cloudinary.com/") ||
@@ -142,9 +143,16 @@ productSchema.pre("deleteMany", async function (next) {
         ? getCldPublicIdFromUrl(variant.variant_img)
         : []
     ),
+
+    // Collect public IDs from images in product_description if they are Cloudinary URLs
+    ...extractImageLinksFromHTML(product.product_description || "")
+      .filter(
+        (url) => url.startsWith("https://res.cloudinary.com/") || url.startsWith("SEO_Images")
+      )
+      .map((url) => getCldPublicIdFromUrl(url)),
   ]);
 
-  // Xóa các tài nguyên trong Cloudinary
+  // Delete resources in Cloudinary if there are any public IDs
   if (publicIds.length > 0) {
     await cloudinary.api.delete_resources(publicIds, {
       resource_type: "image",
