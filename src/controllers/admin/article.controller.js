@@ -102,7 +102,7 @@ export const putArticle = async (req, res, next) => {
   }
 };
 
-// [DELETE] /api/admin/articles/{id}
+// [DELETE] /api/admin/articles
 export const deleteArticle = async (req, res, next) => {
   try {
     const ids = req.body.ids;

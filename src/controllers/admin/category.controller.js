@@ -6,7 +6,7 @@ import { notFound, ok, error, created } from "../../handlers/respone.handler.js"
 // [GET] / api/admin/categories
 export const getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.aggregate([{ $match: {} }]);
+    const categories = await Category.aggregate([{ $match: {} }, { $sort: { createdAt: -1 } }]);
 
     // console.log("products: ", products);
 
@@ -78,6 +78,25 @@ export const putCategory = async (req, res, next) => {
     const putCategory = await Category.findOneAndUpdate({ _id: objectId }, updateCategory);
 
     if (!putCategory) return notFound(res, {});
+    return ok(res, {});
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res);
+  }
+};
+
+// [DELETE] /api/admin/categories
+export const deleteCategory = async (req, res, next) => {
+  try {
+    const ids = req.body.ids;
+    if (!ids.length) return badRequest(res, {});
+
+    const deleteResult = await Category.deleteMany({ _id: { $in: ids } });
+
+    // Nếu không có tài liệu nào bị xóa, trả về notFound
+    if (!deleteResult.deletedCount) return notFound(res, {});
+
+    // Nếu có tài liệu bị xóa, trả về ok
     return ok(res, {});
   } catch (err) {
     console.log("Err: " + err);
