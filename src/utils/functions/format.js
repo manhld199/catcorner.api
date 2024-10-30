@@ -1,5 +1,7 @@
+import { JSDOM } from "jsdom";
+
 // format functions are used for format value. Ex: 1000 -> 1.000 vnd
-const createSlug = (string) => {
+export const createSlug = (string) => {
   if (typeof string != "string") return "";
 
   const a = "àáäâãåăæąçćčđďèéěėëêęğǵḧìíïîįłḿǹńňñòóöôœøṕŕřßşśšșťțùúüûǘůűūųẃẍÿýźžż·/_,:;";
@@ -24,4 +26,27 @@ const createSlug = (string) => {
     .replace(/-+$/, "");
 };
 
-export { createSlug };
+export const getCldPublicIdFromUrl = (url) => {
+  try {
+    if (url.startsWith("SEO_Images")) {
+      const splitedArr = url.split("/");
+      const publicId = splitedArr[splitedArr.length - 1];
+      return publicId;
+    } else if (url.startsWith("https://res.cloudinary.com")) {
+      const startIndex = url.indexOf("upload/") + "upload/".length;
+      const str = url.slice(startIndex).split("/").slice(1).join("/");
+      const endIndex = str.lastIndexOf(".");
+      const publicId = str.substring(0, endIndex);
+      return publicId;
+    }
+  } catch (error) {
+    console.error(">> Error in getCldPublicIdFromUrl:", error.message);
+    return undefined;
+  }
+};
+
+export const extractImageLinksFromHTML = (htmlString) => {
+  const dom = new JSDOM(htmlString);
+  const document = dom.window.document;
+  return Array.from(document.querySelectorAll("img")).map((img) => img.src);
+};

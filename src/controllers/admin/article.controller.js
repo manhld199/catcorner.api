@@ -101,3 +101,22 @@ export const putArticle = async (req, res, next) => {
     return error(res);
   }
 };
+
+// [DELETE] /api/admin/articles/{id}
+export const deleteArticle = async (req, res, next) => {
+  try {
+    const ids = req.body.ids;
+    if (!ids.length) return badRequest(res, {});
+
+    const deleteResult = await Article.deleteMany({ _id: { $in: ids } });
+
+    // Nếu không có tài liệu nào bị xóa, trả về notFound
+    if (!deleteResult.deletedCount) return notFound(res, {});
+
+    // Nếu có tài liệu bị xóa, trả về ok
+    return ok(res, {});
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res);
+  }
+};
