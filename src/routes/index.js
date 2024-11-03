@@ -12,9 +12,8 @@ const route = (app) => {
   app.use("/api/auth", authRouter);
   // init passport
   if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_CALLBACK_URL) {
-  app.use(passport.initialize());
+    app.use(passport.initialize());
   }
-
 };
 
 export default route;
