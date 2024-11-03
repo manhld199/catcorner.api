@@ -19,7 +19,7 @@ passport.use(new GoogleStrategy({
         user_name: profile.displayName,
         user_password: 'google-auth', // You might want to handle this differently
         is_email_verified: true,
-        user_role: 'USER'
+        user_role: 'User'
       });
       await user.save();
     }
@@ -56,7 +56,7 @@ passport.use(new FacebookStrategy({
         user_password: 'facebook-auth', // You might want to handle this differently
         user_email: profile.emails ? profile.emails[0].value : undefined,
         is_email_verified: true,
-        user_role: 'USER'
+        user_role: 'User'
       });
     }
     const token = generateToken(user);
