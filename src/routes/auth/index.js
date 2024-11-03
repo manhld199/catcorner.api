@@ -8,8 +8,10 @@ import {
   googleAuthCallback,
   facebookAuth,
   facebookAuthCallback,
-  refreshToken
+  refreshToken,
+  getMe
 } from "../../controllers/auth/auth.controller.js";
+import { verifyToken } from "../../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -18,6 +20,8 @@ router.get("/verify-email", verifyEmail);
 router.get("/check-email", checkEmail);
 router.post("/login", login);
 router.post("/refresh-token", refreshToken);
+router.get("/me", verifyToken, getMe);
+
 
 // OAuth routes
 router.get('/google', googleAuth);

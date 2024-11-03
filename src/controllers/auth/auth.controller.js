@@ -185,7 +185,7 @@ export const googleAuthCallback = (req, res, next) => {
     const { token, user } = data;
 
     // Redirect with token and name
-    res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
+    res.redirect(`${process.env.FE_URL}/?token=${token}`);
 
   })(req, res, next);
 };
@@ -201,7 +201,7 @@ export const facebookAuthCallback = (req, res, next) => {
     }
     const { token, user } = data;
     // Redirect with token and name
-    res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
+    res.redirect(`${process.env.FE_URL}/?token=${token}`);
 
   })(req, res, next);
 };
@@ -263,6 +263,33 @@ export const refreshToken = async (req, res) => {
     if (err instanceof jwt.JsonWebTokenError) {
       return unauthorize(res, "Invalid refresh token");
     }
+    console.log("Err: ", err);
+    return error(res, { message: "Internal server error" }, 500);
+  }
+};
+
+// [GET] /api/auth/me
+export const getMe = async (req, res) => {
+  try {
+    // req.user đã được decode từ middleware verifyToken
+    const user = await User.findById(req.user.user_id);
+    
+    if (!user) {
+      return error(res, "User not found", 404);
+    }
+
+    return ok(res, {
+      user: {
+        id: user._id,
+        name: user.user_name,
+        email: user.user_email,
+        role: user.user_role,
+      },
+      expiresIn: 3600, // 1 giờ
+      refreshToken: user.refresh_token // Thêm refresh token vào response
+    });
+
+  } catch (err) {
     console.log("Err: ", err);
     return error(res, { message: "Internal server error" }, 500);
   }
