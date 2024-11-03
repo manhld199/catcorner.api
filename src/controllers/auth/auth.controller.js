@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import argon2 from "argon2";
 
-import { ok, error, badRequest } from "../../handlers/respone.handler.js";
+import { ok, error, badRequest, unauthorize } from "../../handlers/respone.handler.js";
 import { USER_ROLES } from "../../utils/constants/index.js";
 import User from "../../models/user.model.js";
 import { sendVerificationEmail } from "../../utils/functions/emailService.js";
@@ -204,4 +204,66 @@ export const facebookAuthCallback = (req, res, next) => {
     res.redirect(`${process.env.FE_URL}/?token=${token}&name=${encodeURIComponent(user.user_name)}`);
 
   })(req, res, next);
+};
+
+// [POST] /api/auth/refresh-token
+export const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return badRequest(res, "Refresh token is required");
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    
+    // Tìm user với refresh token này
+    const user = await User.findOne({ 
+      _id: decoded.user_id,
+      refresh_token: refreshToken 
+    });
+
+    if (!user) {
+      return unauthorize(res, "Invalid refresh token");
+    }
+
+    // Tạo access token mới
+    const newAccessToken = jwt.sign(
+      {
+        user_id: user._id,
+        name: user.user_name,
+        user_roles: user.user_role,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    // Tạo refresh token mới (optional)
+    const newRefreshToken = jwt.sign(
+      { user_id: user._id },
+      process.env.REFRESH_TOKEN_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // Cập nhật refresh token mới trong database
+    user.refresh_token = newRefreshToken;
+    await user.save();
+
+    return ok(res, {
+      token: newAccessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: 3600, // 1 giờ
+    });
+
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      return unauthorize(res, "Refresh token has expired");
+    }
+    if (err instanceof jwt.JsonWebTokenError) {
+      return unauthorize(res, "Invalid refresh token");
+    }
+    console.log("Err: ", err);
+    return error(res, { message: "Internal server error" }, 500);
+  }
 };
