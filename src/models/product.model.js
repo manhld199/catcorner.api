@@ -26,6 +26,14 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    product_sold_quantity: {
+      type: Number,
+      min: 0,
+      default: 0,
+      get: function (value) {
+        return value !== undefined ? value : 100;
+      },
+    },
     product_specifications: [
       {
         name: {
@@ -78,6 +86,7 @@ const productSchema = new mongoose.Schema(
         default: 0,
       },
     },
+    review_count: [Number],
     recent_reviews: [
       {
         user_id: {
