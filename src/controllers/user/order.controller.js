@@ -11,12 +11,41 @@ export const getOrders = async (req, res) => {
       sort = "createdAt",
       order = "desc",
       page = 1,
-      limit = 10 
+      limit = 10,
+      product_name = "", // Thêm filter product_name
+      order_id = ""      // Thêm filter order_id
     } = req.query;
 
     let query = { user_id: user_id };
+    
+    // Filter by status
     if (status) {
       query.order_status = status;
+    }
+
+    // Filter by order_id using regex for partial match
+    if (order_id) {
+      // try {
+      //   query._id = new mongoose.Types.ObjectId(order_id);
+      // } catch (err) {
+      //   // Nếu order_id không phải là valid ObjectId, trả về mảng rỗng
+      //   return ok(res, {
+      //     orders: [],
+      //     pagination: {
+      //       page: parseInt(page),
+      //       limit: parseInt(limit),
+      //       total: 0,
+      //       total_pages: 0
+      //     }
+      //   });
+      // }
+      query.$expr = {
+        $regexMatch: {
+          input: { $toString: "$_id" },
+          regex: order_id,
+          options: "i"
+        }
+      }
     }
 
     const sortObj = {};
@@ -62,6 +91,15 @@ export const getOrders = async (req, res) => {
           as: "product_info"
         }
       },
+      // Filter by product_name
+      ...(product_name ? [{
+        $match: {
+          "product_info.product_name": {
+            $regex: product_name,
+            $options: 'i'
+          }
+        }
+      }] : []),
       // Thêm thông tin product vào order_products
       {
         $addFields: {
@@ -112,16 +150,51 @@ export const getOrders = async (req, res) => {
       { $limit: parseInt(limit) }
     ]);
 
-    // Đếm tổng số orders
-    const total = await Order.countDocuments(query);
+    // Đếm tổng số orders phù hợp với điều kiện filter
+    const total = await Order.aggregate([
+      { $match: query },
+      { $unwind: "$order_products" },
+      {
+        $lookup: {
+          from: "products",
+          let: { productId: { $toObjectId: "$order_products.product_id" } },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$productId"] }
+              }
+            }
+          ],
+          as: "product_info"
+        }
+      },
+      ...(product_name ? [{
+        $match: {
+          "product_info.product_name": {
+            $regex: product_name,
+            $options: 'i'
+          }
+        }
+      }] : []),
+      {
+        $group: {
+          _id: "$_id"
+        }
+      },
+      {
+        $count: "total"
+      }
+    ]);
+
+    const totalCount = total.length > 0 ? total[0].total : 0;
 
     return ok(res, {
       orders,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total,
-        total_pages: Math.ceil(total / limit)
+        total: totalCount,
+        total_pages: Math.ceil(totalCount / limit)
       }
     });
 
@@ -130,6 +203,8 @@ export const getOrders = async (req, res) => {
     return error(res, "Internal server error");
   }
 };
+
+
 // [GET] /api/orders/:id
 export const getOrderById = async (req, res) => {
   try {
