@@ -131,12 +131,13 @@ export const login = async (req, res) => {
     if (!user.is_email_verified) {
       return badRequest(res, "Please verify your email before logging in");
     }
-    // Tạo JWT token
+    // Tạo JWT token với thêm user_avt
     const token = jwt.sign(
       {
         user_id: user._id,
         name: user.user_name,
         user_roles: user.user_role,
+        user_avt: user.user_avt || null, // Thêm user_avt vào token
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -158,6 +159,7 @@ export const login = async (req, res) => {
         name: user.user_name,
         email: user.user_email,
         role: user.user_role,
+        user_avt: user.user_avt || null, // Thêm user_avt vào response
       },
       expiresIn: 3600, // 1 giờ
       refreshToken,
@@ -182,11 +184,11 @@ export const googleAuthCallback = (req, res, next) => {
       return badRequest(res, "Google authentication failed");
     }
     
+    // Đảm bảo token được tạo có chứa user_avt
     const { token, user } = data;
-
-    // Redirect with token and name
+    
+    // Redirect với token đã bao gồm user_avt
     res.redirect(`${process.env.FE_URL}/?token=${token}`);
-
   })(req, res, next);
 };
 export const facebookAuth = passport.authenticate('facebook', { scope: ['email'] });
@@ -199,10 +201,12 @@ export const facebookAuthCallback = (req, res, next) => {
     if (!data) {
       res.redirect(`${process.env.FE_URL}/login`);
     }
+    
+    // Đảm bảo token được tạo có chứa user_avt
     const { token, user } = data;
-    // Redirect with token and name
+    
+    // Redirect với token đã bao gồm user_avt
     res.redirect(`${process.env.FE_URL}/?token=${token}`);
-
   })(req, res, next);
 };
 
@@ -228,12 +232,13 @@ export const refreshToken = async (req, res) => {
       return unauthorize(res, "Invalid refresh token");
     }
 
-    // Tạo access token mới
+    // Tạo access token mới với user_avt
     const newAccessToken = jwt.sign(
       {
         user_id: user._id,
         name: user.user_name,
         user_roles: user.user_role,
+        user_avt: user.user_avt || null, // Thêm user_avt vào token mới
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -284,6 +289,7 @@ export const getMe = async (req, res) => {
         name: user.user_name,
         email: user.user_email,
         role: user.user_role,
+        user_avt: user.user_avt || null, // Thêm user_avt vào response
       },
       expiresIn: 3600, // 1 giờ
       refreshToken: user.refresh_token // Thêm refresh token vào response
@@ -292,5 +298,55 @@ export const getMe = async (req, res) => {
   } catch (err) {
     console.log("Err: ", err);
     return error(res, { message: "Internal server error" }, 500);
+  }
+};
+
+// [PUT] /api/auth/change-password
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.user.user_id; // Lấy từ token đã decode
+    const { current_password, new_password } = req.body;
+
+    // Validate input
+    if (!current_password || !new_password) {
+      return badRequest(res, "Current password and new password are required");
+    }
+
+    // Tìm user
+    const user = await User.findById(userId);
+    if (!user) {
+      return notFound(res, "User not found");
+    }
+
+    // Kiểm tra nếu tài khoản đăng nhập bằng Google/Facebook
+    if (user.user_password === 'google-auth' || user.user_password === 'facebook-auth') {
+      return badRequest(res, "Cannot change password for social login accounts");
+    }
+
+    // Verify mật khẩu hiện tại
+    const isValidPassword = await argon2.verify(user.user_password, current_password);
+    if (!isValidPassword) {
+      return badRequest(res, "Current password is incorrect");
+    }
+
+    // Validate mật khẩu mới
+    if (new_password.length < 6) {
+      return badRequest(res, "New password must be at least 6 characters long");
+    }
+
+    // Hash mật khẩu mới
+    const hashedNewPassword = await argon2.hash(new_password);
+
+    // Cập nhật mật khẩu
+    user.user_password = hashedNewPassword;
+    await user.save();
+
+    return ok(res, { 
+      message: "Password changed successfully"
+    });
+
+  } catch (err) {
+    console.log("Error:", err);
+    return error(res, "Internal server error");
   }
 };

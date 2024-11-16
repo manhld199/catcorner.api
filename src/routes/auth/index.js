@@ -9,7 +9,8 @@ import {
   facebookAuth,
   facebookAuthCallback,
   refreshToken,
-  getMe
+  getMe,
+  changePassword
 } from "../../controllers/auth/auth.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
@@ -28,5 +29,8 @@ router.get('/google', googleAuth);
 router.get('/google/callback', googleAuthCallback);
 router.get('/facebook', facebookAuth);
 router.get('/facebook/callback', facebookAuthCallback);
+
+//  route change password, forgot password
+router.put("/change-password", verifyToken, changePassword);
 
 export default router;
