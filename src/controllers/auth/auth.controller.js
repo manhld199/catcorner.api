@@ -6,6 +6,8 @@ import { USER_ROLES } from "../../utils/constants/index.js";
 import User from "../../models/user.model.js";
 import { sendVerificationEmail } from "../../utils/functions/emailService.js";
 import passport from '../../passport.js';
+import OTP from "../../models/otp.model.js";
+import { sendOTPEmail } from "../../utils/functions/emailService.js";
 
 // [POST] /api/auth/register
 export const register = async (req, res, next) => {
@@ -346,6 +348,134 @@ export const changePassword = async (req, res) => {
     });
 
   } catch (err) {
+    console.log("Error:", err);
+    return error(res, "Internal server error");
+  }
+};
+
+// [POST] /api/auth/forgot-password
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return badRequest(res, "Email is required");
+    }
+
+    // Kiểm tra user có tồn tại
+    const user = await User.findOne({ user_email: email });
+    if (!user) {
+      return notFound(res, "User not found");
+    }
+
+    // Kiểm tra nếu là tài khoản social
+    if (user.user_password === 'google-auth' || user.user_password === 'facebook-auth') {
+      return badRequest(res, "Cannot reset password for social login accounts");
+    }
+
+    // Tạo OTP 6 số
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Lưu OTP vào database
+    await OTP.create({
+      email,
+      otp
+    });
+
+    // Gửi email chứa OTP
+    await sendOTPEmail(email, otp);
+
+    return ok(res, {
+      message: "OTP has been sent to your email"
+    });
+
+  } catch (err) {
+    console.log("Error:", err);
+    return error(res, "Internal server error");
+  }
+};
+
+// [POST] /api/auth/verify-otp
+export const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return badRequest(res, "Email and OTP are required");
+    }
+
+    // Tìm OTP trong database
+    const otpRecord = await OTP.findOne({
+      email,
+      otp,
+      createdAt: { $gt: new Date(Date.now() - 300000) } // OTP còn hiệu lực (5 phút)
+    });
+
+    if (!otpRecord) {
+      return badRequest(res, "Invalid or expired OTP");
+    }
+
+    // Tạo token tạm thời để xác thực cho bước reset password
+    const resetToken = jwt.sign(
+      { email, otpId: otpRecord._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "5m" } // Token có hiệu lực 5 phút
+    );
+
+    return ok(res, {
+      message: "OTP verified successfully",
+      resetToken
+    });
+
+  } catch (err) {
+    console.log("Error:", err);
+    return error(res, "Internal server error");
+  }
+};
+
+// [POST] /api/auth/reset-password
+export const resetPassword = async (req, res) => {
+  try {
+    const { resetToken, new_password } = req.body;
+
+    if (!resetToken || !new_password) {
+      return badRequest(res, "Reset token and new password are required");
+    }
+
+    // Validate mật khẩu mới
+    if (new_password.length < 6) {
+      return badRequest(res, "New password must be at least 6 characters long");
+    }
+
+    // Verify reset token
+    const decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
+    const { email, otpId } = decoded;
+
+    // Tìm user
+    const user = await User.findOne({ user_email: email });
+    if (!user) {
+      return notFound(res, "User not found");
+    }
+
+    // Hash và cập nhật mật khẩu mới
+    const hashedPassword = await argon2.hash(new_password);
+    user.user_password = hashedPassword;
+    await user.save();
+
+    // Xóa OTP đã sử dụng
+    await OTP.deleteOne({ _id: otpId });
+
+    return ok(res, {
+      message: "Password has been reset successfully"
+    });
+
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      return badRequest(res, "Reset token has expired");
+    }
+    if (err instanceof jwt.JsonWebTokenError) {
+      return badRequest(res, "Invalid reset token");
+    }
     console.log("Error:", err);
     return error(res, "Internal server error");
   }
