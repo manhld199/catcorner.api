@@ -39,3 +39,19 @@ export const sendVerificationEmail = async (to, verificationLink) => {
     throw new Error("Failed to send verification email");
   }
 };
+
+export const sendOTPEmail = async (email, otp) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "CatCorner Shop - Password Reset OTP",
+    html: `
+      <h1>Password Reset Request</h1>
+      <p>Your OTP for password reset is: <strong>${otp}</strong></p>
+      <p>This OTP will expire in 5 minutes.</p>
+      <p>If you didn't request this, please ignore this email.</p>
+    `
+  };
+  
+  await transporter.sendMail(mailOptions);
+};
