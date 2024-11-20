@@ -1,5 +1,5 @@
 import Order from "../../models/order.model.js";
-import { ok, error, notFound } from "../../handlers/respone.handler.js";
+import { ok, error, notFound, badRequest } from "../../handlers/respone.handler.js";
 import mongoose from "mongoose";
 
 // [GET] /api/orders
@@ -12,8 +12,9 @@ export const getOrders = async (req, res) => {
       order = "desc",
       page = 1,
       limit = 10,
-      product_name = "", // Thêm filter product_name
-      order_id = ""      // Thêm filter order_id
+      product_name = "", 
+      order_id = "",
+      phone_number = ""
     } = req.query;
 
     let query = { user_id: user_id };
@@ -23,22 +24,8 @@ export const getOrders = async (req, res) => {
       query.order_status = status;
     }
 
-    // Filter by order_id using regex for partial match
+    // Filter by order_id
     if (order_id) {
-      // try {
-      //   query._id = new mongoose.Types.ObjectId(order_id);
-      // } catch (err) {
-      //   // Nếu order_id không phải là valid ObjectId, trả về mảng rỗng
-      //   return ok(res, {
-      //     orders: [],
-      //     pagination: {
-      //       page: parseInt(page),
-      //       limit: parseInt(limit),
-      //       total: 0,
-      //       total_pages: 0
-      //     }
-      //   });
-      // }
       query.$expr = {
         $regexMatch: {
           input: { $toString: "$_id" },
@@ -46,6 +33,11 @@ export const getOrders = async (req, res) => {
           options: "i"
         }
       }
+    }
+
+    // Filter by exact phone number match
+    if (phone_number) {
+      query["order_buyer.phone_number"] = phone_number;
     }
 
     const sortObj = {};
@@ -317,6 +309,132 @@ export const getOrderById = async (req, res) => {
     if (err.name === 'CastError') {
       return error(res, "Invalid order ID");
     }
+    return error(res, "Internal server error");
+  }
+};
+
+// [GET] /api/orders/track
+export const trackOrder = async (req, res) => {
+  try {
+    const { order_id, phone_number } = req.query;
+
+    // Validate required fields
+    if (!order_id || !phone_number) {
+      return badRequest(res, "Order ID and phone number are required");
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^[0-9]{10,11}$/;
+    if (!phoneRegex.test(phone_number)) {
+      return badRequest(res, "Invalid phone number format");
+    }
+
+    // Convert order_id string to ObjectId
+    let orderId;
+    try {
+      orderId = new mongoose.Types.ObjectId(order_id);
+    } catch (err) {
+      return badRequest(res, "Invalid order ID format");
+    }
+
+    const order = await Order.aggregate([
+      { 
+        $match: { 
+          _id: orderId,
+          "order_buyer.phone_number": phone_number
+        }
+      },
+      // Unwind order_products để xử lý từng sản phẩm
+      {
+        $unwind: "$order_products"
+      },
+      // Lookup để lấy thông tin product
+      {
+        $lookup: {
+          from: "products",
+          let: { 
+            productId: { $toObjectId: "$order_products.product_id" },
+            variantId: { $toObjectId: "$order_products.variant_id" }
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$productId"] }
+              }
+            },
+            {
+              $project: {
+                _id: 1,
+                product_name: 1,
+                product_imgs: { $arrayElemAt: ["$product_imgs", 0] },
+                variant: {
+                  $arrayElemAt: [{
+                    $filter: {
+                      input: "$product_variants",
+                      as: "v",
+                      cond: { $eq: ["$$v._id", "$$variantId"] }
+                    }
+                  }, 0]
+                }
+              }
+            }
+          ],
+          as: "product_info"
+        }
+      },
+      // Thêm thông tin product vào order_products
+      {
+        $addFields: {
+          "order_products.product_name": { 
+            $arrayElemAt: ["$product_info.product_name", 0] 
+          },
+          "order_products.product_img": { 
+            $arrayElemAt: ["$product_info.product_imgs", 0] 
+          },
+          "order_products.variant_name": { 
+            $arrayElemAt: ["$product_info.variant.variant_name", 0] 
+          },
+          "order_products.variant_img": { 
+            $arrayElemAt: ["$product_info.variant.variant_img", 0] 
+          }
+        }
+      },
+      // Group lại để khôi phục cấu trúc order ban đầu
+      {
+        $group: {
+          _id: "$_id",
+          order_buyer: { $first: "$order_buyer" },
+          order_note: { $first: "$order_note" },
+          total_products_cost: { $first: "$total_products_cost" },
+          shipping_cost: { $first: "$shipping_cost" },
+          final_cost: { $first: "$final_cost" },
+          order_status: { $first: "$order_status" },
+          createdAt: { $first: "$createdAt" },
+          order_products: { 
+            $push: {
+              product_id: "$order_products.product_id",
+              variant_id: "$order_products.variant_id",
+              quantity: "$order_products.quantity",
+              unit_price: "$order_products.unit_price",
+              discount_percent: "$order_products.discount_percent",
+              product_name: "$order_products.product_name",
+              product_img: "$order_products.product_img",
+              variant_name: "$order_products.variant_name",
+              variant_img: "$order_products.variant_img"
+            }
+          }
+        }
+      }
+    ]);
+
+    if (!order || order.length === 0) {
+      return notFound(res, "Order not found");
+    }
+
+    return ok(res, { order: order[0] });
+
+  } catch (err) {
+    console.log("Error:", err);
     return error(res, "Internal server error");
   }
 };
