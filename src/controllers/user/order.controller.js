@@ -266,7 +266,7 @@ export const getOrderById = async (req, res) => {
           }
         }
       },
-      // Group lại để khôi phục cấu trúc order ban đầu
+      // Group lại để khôi phục cấu tr��c order ban đầu
       {
         $group: {
           _id: "$_id",
@@ -329,13 +329,14 @@ export const trackOrder = async (req, res) => {
       return badRequest(res, "Invalid phone number format");
     }
 
-    // Convert order_id string to ObjectId
-    let orderId;
-    try {
-      orderId = new mongoose.Types.ObjectId(order_id);
-    } catch (err) {
-      return badRequest(res, "Invalid order ID format");
+    // Validate order_id format (24 hex characters)
+    const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+    if (!objectIdRegex.test(order_id)) {
+      return badRequest(res, "Invalid order ID format - must be 24 hex characters");
     }
+
+    // Convert order_id string to ObjectId
+    const orderId = new mongoose.Types.ObjectId(order_id);
 
     const order = await Order.aggregate([
       { 
