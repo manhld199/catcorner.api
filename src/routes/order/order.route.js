@@ -1,12 +1,14 @@
 import express from "express";
-import { getOrders, getOrderById } from "../../controllers/user/order.controller.js";
+import { getOrders, getOrderById, trackOrder } from "../../controllers/user/order.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
-// Tất cả các routes đều cần xác thực token
-router.use(verifyToken);
+// Route tra cứu đơn hàng không cần xác thực
+router.get("/track", trackOrder);
 
+// Các routes khác cần xác thực token
+router.use(verifyToken);
 router.get("/", getOrders);
 router.get("/:id", getOrderById);
 
