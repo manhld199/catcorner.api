@@ -47,9 +47,62 @@ export const getProducts = async (req, res, next) => {
       {
         $lookup: {
           from: "categories",
-          localField: "categories",
+          localField: "category_id",
           foreignField: "_id",
           as: "category_info"
+        }
+      },
+      {
+        $lookup: {
+          from: "orders",
+          let: { productId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $in: ["$$productId", "$order_products.product_id"]
+                }
+              }
+            },
+            {
+              $unwind: "$order_products"
+            },
+            {
+              $match: {
+                $expr: {
+                  $eq: ["$order_products.product_id", "$$productId"]
+                }
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                total_sold: { $sum: "$order_products.quantity" }
+              }
+            }
+          ],
+          as: "order_stats"
+        }
+      },
+      {
+        $addFields: {
+          product_avg_rating: {
+            $cond: [
+              { $eq: ["$product_rating.rating_count", 0] },
+              0,
+              { $divide: ["$product_rating.rating_point", "$product_rating.rating_count"] }
+            ]
+          },
+          highest_discount: {
+            $max: "$product_variants.variant_discount_percent"
+          },
+          product_sold_quantity: {
+            $cond: {
+              if: { $gt: [{ $size: "$order_stats" }, 0] },
+              then: { $arrayElemAt: ["$order_stats.total_sold", 0] },
+              else: 0
+            }
+          }
         }
       },
       {
@@ -60,16 +113,32 @@ export const getProducts = async (req, res, next) => {
           product_imgs: { $arrayElemAt: ["$product_imgs", 0] },
           product_avg_rating: 1,
           product_short_description: 1,
-          category_names: 1,
+          highest_discount: 1,
+          product_sold_quantity: 1,
+          category: {
+            _id: { $arrayElemAt: ["$category_info._id", 0] },
+            name: { $arrayElemAt: ["$category_info.category_name", 0] }
+          },
           product_variants: {
             $map: {
               input: "$product_variants",
               as: "variant",
               in: {
                 variant_name: "$$variant.variant_name",
-                price: "$$variant.price",
-                discount_amount: "$$variant.discount_amount",
-                variant_slug: "$$variant.variant_slug"
+                variant_slug: "$$variant.variant_slug",
+                variant_price: "$$variant.variant_price",
+                variant_discount_percent: "$$variant.variant_discount_percent",
+                discounted_price: {
+                  $subtract: [
+                    "$$variant.variant_price",
+                    {
+                      $multiply: [
+                        "$$variant.variant_price",
+                        { $divide: ["$$variant.variant_discount_percent", 100] }
+                      ]
+                    }
+                  ]
+                }
               }
             }
           },
