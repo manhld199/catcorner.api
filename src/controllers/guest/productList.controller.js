@@ -301,7 +301,7 @@ export const search = async (req, res) => {
     if (category) {
       // Kiểm tra nếu category là ObjectId hợp lệ
       if (mongoose.Types.ObjectId.isValid(category)) {
-        searchConditions["category_id"] = new mongoose.Types.ObjectId(category);
+        searchConditions["category_id"] = mongoose.Types.ObjectId(category);
       } else {
         // Nếu không, tìm kiếm theo tên hoặc xử lý chuỗi thông thường
         searchConditions["category_id.name"] = { $regex: category, $options: "i" };
