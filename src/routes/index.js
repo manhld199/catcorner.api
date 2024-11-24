@@ -2,7 +2,9 @@ import adminRouter from "./admin/index.js";
 import guestRouter from "./guest/index.js";
 import cloudinaryRouter from "./cloudinary/index.js";
 import authRouter from "./auth/index.js";
+import orderRouter from "./order/order.route.js";
 import passport from "../passport.js";
+import userRouter from "./user/user.route.js";
 
 const route = (app) => {
   app.get("/", (req, res) => res.send("Express on Vercel"));
@@ -10,6 +12,8 @@ const route = (app) => {
   app.use("/api/guest", guestRouter);
   app.use("/api/cloudinary", cloudinaryRouter);
   app.use("/api/auth", authRouter);
+  app.use("/api/orders", orderRouter);
+  app.use("/api/user", userRouter);
   // init passport
   if (
     process.env.GOOGLE_CLIENT_ID &&
