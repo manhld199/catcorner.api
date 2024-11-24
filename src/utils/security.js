@@ -1,22 +1,36 @@
 import nacl from "tweetnacl";
 
+// Kiểm tra và đọc khóa từ biến môi trường
+if (!process.env.TWEETNACL_PUBLIC_KEY_BASE64 || !process.env.TWEETNACL_SECRET_KEY_BASE64) {
+  throw new Error(
+    "Missing TWEETNACL_PUBLIC_KEY_BASE64 or TWEETNACL_SECRET_KEY_BASE64 in environment variables."
+  );
+}
+
 const publicKey = Buffer.from(process.env.TWEETNACL_PUBLIC_KEY_BASE64, "base64");
 const secretKey = Buffer.from(process.env.TWEETNACL_SECRET_KEY_BASE64, "base64");
 
 const encryptData = (data) => {
-  const nonce = new Uint8Array(nacl.box.nonceLength);
+  if (!data || typeof data !== "string") {
+    throw new TypeError("Invalid data: must be a non-empty string");
+  }
 
-  // Encode data as UTF-8 before encryption
+  // Tạo nonce ngẫu nhiên
+  const nonce = nacl.randomBytes(nacl.box.nonceLength);
+
+  // Mã hóa dữ liệu
   const encodedData = Buffer.from(data, "utf-8");
-
-  // Encrypt the data
   const encryptedData = nacl.box(encodedData, nonce, publicKey, secretKey);
 
-  // Convert the encrypted data to base64 for string representation
-  const base64Encoded = Buffer.from(encryptedData).toString("base64");
+  if (!encryptedData) {
+    throw new Error("Encryption failed");
+  }
 
-  // Change special letter
-  const encryptedString = encodeURIComponent(base64Encoded)
+  // Ghép nonce và dữ liệu mã hóa, sau đó chuyển đổi thành chuỗi base64
+  const combinedData = Buffer.from([...nonce, ...encryptedData]).toString("base64");
+
+  // Encode URI và thay thế các ký tự đặc biệt
+  const encryptedString = encodeURIComponent(combinedData)
     .replaceAll("%21", "!")
     .replaceAll("%27", "'")
     .replaceAll("%28", "(")
@@ -27,18 +41,24 @@ const encryptData = (data) => {
 };
 
 const decryptData = (encryptedData) => {
-  const nonce = new Uint8Array(nacl.box.nonceLength);
+  if (!encryptedData || typeof encryptedData !== "string") {
+    throw new TypeError("Invalid encrypted data: must be a non-empty string");
+  }
 
-  // Decode the base64 encoded string back to a Uint8Array
+  // Giải mã chuỗi base64 và tách nonce khỏi dữ liệu mã hóa
   const decodedData = Buffer.from(encryptedData, "base64");
+  const nonce = decodedData.slice(0, nacl.box.nonceLength); // Nonce được lưu ở phần đầu
+  const cipherText = decodedData.slice(nacl.box.nonceLength); // Dữ liệu mã hóa thực tế
 
-  // Perform decryption using nacl.box.open
-  const decryptedData = nacl.box.open(decodedData, nonce, publicKey, secretKey);
+  // Giải mã dữ liệu
+  const decryptedData = nacl.box.open(cipherText, nonce, publicKey, secretKey);
 
-  // Convert the decrypted data back to a string (assuming UTF-8 encoding)
-  const decryptedString = Buffer.from(decryptedData).toString("utf-8");
+  if (!decryptedData) {
+    throw new Error("Decryption failed");
+  }
 
-  return decryptedString;
+  // Chuyển dữ liệu giải mã thành chuỗi UTF-8
+  return Buffer.from(decryptedData).toString("utf-8");
 };
 
 export { encryptData, decryptData };
