@@ -1,4 +1,8 @@
 import nacl from "tweetnacl";
+import dotenv from "dotenv";
+
+// Nạp các biến môi trường từ file .env
+dotenv.config();
 
 // Kiểm tra và đọc khóa từ biến môi trường
 if (!process.env.TWEETNACL_PUBLIC_KEY_BASE64 || !process.env.TWEETNACL_SECRET_KEY_BASE64) {
@@ -7,9 +11,11 @@ if (!process.env.TWEETNACL_PUBLIC_KEY_BASE64 || !process.env.TWEETNACL_SECRET_KE
   );
 }
 
+// Chuyển đổi khóa từ base64 sang Buffer
 const publicKey = Buffer.from(process.env.TWEETNACL_PUBLIC_KEY_BASE64, "base64");
 const secretKey = Buffer.from(process.env.TWEETNACL_SECRET_KEY_BASE64, "base64");
 
+// Hàm mã hóa dữ liệu
 const encryptData = (data) => {
   if (!data || typeof data !== "string") {
     throw new TypeError("Invalid data: must be a non-empty string");
@@ -40,6 +46,7 @@ const encryptData = (data) => {
   return encryptedString;
 };
 
+// Hàm giải mã dữ liệu
 const decryptData = (encryptedData) => {
   if (!encryptedData || typeof encryptedData !== "string") {
     throw new TypeError("Invalid encrypted data: must be a non-empty string");
