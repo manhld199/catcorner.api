@@ -1,6 +1,7 @@
 import Product from "../../models/product.model.js";
 import { notFound, ok, error } from "../../handlers/respone.handler.js";
 import { encryptData } from "../../utils/security.js";
+import mongoose from "mongoose";
 
 export const getNewestProducts = async (req, res, next) => {
   try {
@@ -298,7 +299,13 @@ export const search = async (req, res) => {
     }
 
     if (category) {
-      searchConditions["category_id"] = category;
+      // Kiểm tra nếu category là ObjectId hợp lệ
+      if (mongoose.Types.ObjectId.isValid(category)) {
+        searchConditions["category_id"] = new mongoose.Types.ObjectId(category);
+      } else {
+        // Nếu không, tìm kiếm theo tên hoặc xử lý chuỗi thông thường
+        searchConditions["category_id.name"] = { $regex: category, $options: "i" };
+      }
     }
 
     if (rating) {
@@ -332,15 +339,14 @@ export const search = async (req, res) => {
     const totalPages = Math.ceil(totalProducts / perPage);
     const skip = (pageNumber - 1) * perPage;
 
-    // Sử dụng select với các trường có trong mô hình Product
     let products = await Product.find(searchConditions)
       .sort(sortOptions)
       .skip(skip)
       .limit(perPage)
       .select(
         "product_name product_slug product_imgs product_short_description product_description product_sold_quantity product_specifications category_id product_variants product_rating.rating_point product_rating.rating_count review_count"
-      ) // Chọn các trường tồn tại trong mô hình Product
-      .populate("category_id", "category_name"); // Giả định category_id là một đối tượng với trường `name`
+      )
+      .populate("category_id", "category_name");
 
     const transformedProducts = products.map((product) => {
       const lowestPriceVariant = product.product_variants
