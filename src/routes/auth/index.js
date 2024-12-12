@@ -13,7 +13,7 @@ import {
   changePassword,
   forgotPassword,
   verifyOTP,
-  resetPassword
+  resetPassword,
 } from "../../controllers/auth/auth.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
@@ -26,12 +26,11 @@ router.post("/login", login);
 router.post("/refresh-token", refreshToken);
 router.get("/me", verifyToken, getMe);
 
-
 // OAuth routes
-router.get('/google', googleAuth);
-router.get('/google/callback', googleAuthCallback);
-router.get('/facebook', facebookAuth);
-router.get('/facebook/callback', facebookAuthCallback);
+router.get("/google", googleAuth);
+router.get("/google/callback", googleAuthCallback);
+router.get("/facebook", facebookAuth);
+router.get("/facebook/callback", facebookAuthCallback);
 
 //  route change password, forgot password
 router.put("/change-password", verifyToken, changePassword);

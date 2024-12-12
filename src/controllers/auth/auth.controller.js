@@ -5,7 +5,7 @@ import { ok, error, badRequest, unauthorize } from "../../handlers/respone.handl
 import { USER_ROLES } from "../../utils/constants/index.js";
 import User from "../../models/user.model.js";
 import { sendVerificationEmail } from "../../utils/functions/emailService.js";
-import passport from '../../passport.js';
+import passport from "../../passport.js";
 import OTP from "../../models/otp.model.js";
 import { sendOTPEmail } from "../../utils/functions/emailService.js";
 
@@ -13,11 +13,12 @@ import { sendOTPEmail } from "../../utils/functions/emailService.js";
 export const register = async (req, res, next) => {
   try {
     const { email, password, user_name } = req.body;
+    // console.log("{ email, password, user_name }", { email, password, user_name });
 
     // Check if user already exists
     const existingUser = await User.findOne({ user_email: email });
     if (existingUser) {
-      return badRequest(res, "User already exists");
+      return badRequest(res, "Đăng ký thất bại. Email người dùng đã tồn tại!");
     }
 
     // Hash the password using argon2
@@ -43,20 +44,29 @@ export const register = async (req, res, next) => {
     // Create a verification link
     const verificationLink = `${process.env.BASE_URL}/api/auth/verify-email?token=${token}`;
 
-    // Send verification email
-    await sendVerificationEmail(email, verificationLink);
+    // Tạo OTP 6 số
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    return ok(res, { message: "User registered. Please check your email to verify your account." });
+    // Lưu OTP vào database
+    await OTP.create({
+      email,
+      otp,
+    });
+
+    // Send verification email
+    await sendVerificationEmail(email, verificationLink, otp);
+
+    return ok(res, { token: token, message: "Đăng ký thành công. Vui lòng xác thực Email!" });
   } catch (err) {
     console.log("Err: " + err);
-    return error(res, { message: "Internal server error" }, 500);
+    return error(res, { message: "Đăng ký thất bại. Vui lòng thử lại sau!" }, 500);
   }
 };
 
 // [GET] /api/auth/verify-email
 export const verifyEmail = async (req, res) => {
   try {
-    const { token } = req.query;
+    const { token, mobile } = req.query;
 
     if (!token) {
       return badRequest(res, "Token is required");
@@ -80,6 +90,7 @@ export const verifyEmail = async (req, res) => {
     user.is_email_verified = true;
     await user.save();
     // return res.redirect("/login?message=Email verified successfully. Please log in.");
+    if (mobile) return ok(res, { message: "User Verified" });
     return res.redirect(process.env.FE_URL + "/login");
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
@@ -114,13 +125,15 @@ export const checkEmail = async (req, res) => {
     return error(res, { message: "Internal server error" }, 500);
   }
 };
+
 // [POST] /api/auth/login
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ user_email: email });
-    // user not found hoặc là tài khoản gg or fb 
-    if (!user || ( user.user_password == 'google-auth' || user.user_password == 'facebook-auth')) {
+
+    // user not found hoặc là tài khoản gg or fb
+    if (!user || user.user_password == "google-auth" || user.user_password == "facebook-auth") {
       return badRequest(res, "Invalid email or password");
     }
 
@@ -129,10 +142,12 @@ export const login = async (req, res) => {
     if (!isValidPassword) {
       return badRequest(res, "Invalid email or password");
     }
+
     // Kiểm tra xác thực tài khoản
     if (!user.is_email_verified) {
       return badRequest(res, "Please verify your email before logging in");
     }
+
     // Tạo JWT token với thêm user_avt
     const token = jwt.sign(
       {
@@ -167,46 +182,45 @@ export const login = async (req, res) => {
       refreshToken,
     });
   } catch (err) {
-    console.log(err)
+    console.log(err);
     return error(res, { message: "Internal server error" }, 500);
   }
 };
 
-
 // login with gg, fb
 
-export const googleAuth = passport.authenticate('google', { scope: ['profile', 'email'] });
+export const googleAuth = passport.authenticate("google", { scope: ["profile", "email"] });
 
 export const googleAuthCallback = (req, res, next) => {
-  passport.authenticate('google', { session: false }, (err, data) => {
+  passport.authenticate("google", { session: false }, (err, data) => {
     if (err) {
       return next(err);
     }
     if (!data) {
       return badRequest(res, "Google authentication failed");
     }
-    
+
     // Đảm bảo token được tạo có chứa user_avt
     const { token, user } = data;
-    
+
     // Redirect với token đã bao gồm user_avt
     res.redirect(`${process.env.FE_URL}/?token=${token}`);
   })(req, res, next);
 };
-export const facebookAuth = passport.authenticate('facebook', { scope: ['email'] });
+export const facebookAuth = passport.authenticate("facebook", { scope: ["email"] });
 
 export const facebookAuthCallback = (req, res, next) => {
-  passport.authenticate('facebook', { session: false }, (err, data) => {
+  passport.authenticate("facebook", { session: false }, (err, data) => {
     if (err) {
       return next(err);
     }
     if (!data) {
       res.redirect(`${process.env.FE_URL}/login`);
     }
-    
+
     // Đảm bảo token được tạo có chứa user_avt
     const { token, user } = data;
-    
+
     // Redirect với token đã bao gồm user_avt
     res.redirect(`${process.env.FE_URL}/?token=${token}`);
   })(req, res, next);
@@ -223,11 +237,11 @@ export const refreshToken = async (req, res) => {
 
     // Verify refresh token
     const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    
+
     // Tìm user với refresh token này
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       _id: decoded.user_id,
-      refresh_token: refreshToken 
+      refresh_token: refreshToken,
     });
 
     if (!user) {
@@ -247,11 +261,9 @@ export const refreshToken = async (req, res) => {
     );
 
     // Tạo refresh token mới (optional)
-    const newRefreshToken = jwt.sign(
-      { user_id: user._id },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
+    const newRefreshToken = jwt.sign({ user_id: user._id }, process.env.REFRESH_TOKEN_SECRET, {
+      expiresIn: "7d",
+    });
 
     // Cập nhật refresh token mới trong database
     user.refresh_token = newRefreshToken;
@@ -262,7 +274,6 @@ export const refreshToken = async (req, res) => {
       refreshToken: newRefreshToken,
       expiresIn: 3600, // 1 giờ
     });
-
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       return unauthorize(res, "Refresh token has expired");
@@ -280,7 +291,7 @@ export const getMe = async (req, res) => {
   try {
     // req.user đã được decode từ middleware verifyToken
     const user = await User.findById(req.user.user_id);
-    
+
     if (!user) {
       return error(res, "User not found", 404);
     }
@@ -294,9 +305,8 @@ export const getMe = async (req, res) => {
         user_avt: user.user_avt || null, // Thêm user_avt vào response
       },
       expiresIn: 3600, // 1 giờ
-      refreshToken: user.refresh_token // Thêm refresh token vào response
+      refreshToken: user.refresh_token, // Thêm refresh token vào response
     });
-
   } catch (err) {
     console.log("Err: ", err);
     return error(res, { message: "Internal server error" }, 500);
@@ -321,7 +331,7 @@ export const changePassword = async (req, res) => {
     }
 
     // Kiểm tra nếu tài khoản đăng nhập bằng Google/Facebook
-    if (user.user_password === 'google-auth' || user.user_password === 'facebook-auth') {
+    if (user.user_password === "google-auth" || user.user_password === "facebook-auth") {
       return badRequest(res, "Cannot change password for social login accounts");
     }
 
@@ -343,10 +353,9 @@ export const changePassword = async (req, res) => {
     user.user_password = hashedNewPassword;
     await user.save();
 
-    return ok(res, { 
-      message: "Password changed successfully"
+    return ok(res, {
+      message: "Password changed successfully",
     });
-
   } catch (err) {
     console.log("Error:", err);
     return error(res, "Internal server error");
@@ -369,7 +378,7 @@ export const forgotPassword = async (req, res) => {
     }
 
     // Kiểm tra nếu là tài khoản social
-    if (user.user_password === 'google-auth' || user.user_password === 'facebook-auth') {
+    if (user.user_password === "google-auth" || user.user_password === "facebook-auth") {
       return badRequest(res, "Cannot reset password for social login accounts");
     }
 
@@ -379,16 +388,15 @@ export const forgotPassword = async (req, res) => {
     // Lưu OTP vào database
     await OTP.create({
       email,
-      otp
+      otp,
     });
 
     // Gửi email chứa OTP
     await sendOTPEmail(email, otp);
 
     return ok(res, {
-      message: "OTP has been sent to your email"
+      message: "OTP has been sent to your email",
     });
-
   } catch (err) {
     console.log("Error:", err);
     return error(res, "Internal server error");
@@ -408,7 +416,7 @@ export const verifyOTP = async (req, res) => {
     const otpRecord = await OTP.findOne({
       email,
       otp,
-      createdAt: { $gt: new Date(Date.now() - 300000) } // OTP còn hiệu lực (5 phút)
+      createdAt: { $gt: new Date(Date.now() - 300000) }, // OTP còn hiệu lực (5 phút)
     });
 
     if (!otpRecord) {
@@ -424,9 +432,8 @@ export const verifyOTP = async (req, res) => {
 
     return ok(res, {
       message: "OTP verified successfully",
-      resetToken
+      resetToken,
     });
-
   } catch (err) {
     console.log("Error:", err);
     return error(res, "Internal server error");
@@ -466,9 +473,8 @@ export const resetPassword = async (req, res) => {
     await OTP.deleteOne({ _id: otpId });
 
     return ok(res, {
-      message: "Password has been reset successfully"
+      message: "Password has been reset successfully",
     });
-
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       return badRequest(res, "Reset token has expired");
