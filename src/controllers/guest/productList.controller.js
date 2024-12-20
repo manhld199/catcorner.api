@@ -208,7 +208,7 @@ export const getSearchRecommended = async (req, res) => {
 };
 
 // Controller tìm kiếm + bộ lọc kết quả tìm kiếm
-export const search = async (req, res) => {
+export const getSearchResult = async (req, res) => {
   try {
     let { searchKey, category, rating, minPrice, maxPrice, sortBy, discount, page } = req.query;
     const perPage = 20;
