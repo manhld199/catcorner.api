@@ -1,6 +1,7 @@
+import mongoose from "mongoose";
 import Product from "../../models/product.model.js";
-import { ok } from "../../handlers/respone.handler.js";
-import { encryptData } from "../../utils/security.js";
+import { ok, notFound, error } from "../../handlers/respone.handler.js";
+import { decryptData, encryptData } from "../../utils/security.js";
 
 export const getNewestProducts = async (req, res) => {
   try {
@@ -365,5 +366,94 @@ export const getSearchResult = async (req, res) => {
       success: false,
       message: "Đã xảy ra lỗi khi tìm kiếm sản phẩm.",
     });
+  }
+};
+
+export const getOrderProducts = async (req, res) => {
+  try {
+    const orderProducts = req.body.map((item) => ({
+      product_id: new mongoose.Types.ObjectId(decryptData(item.product_hashed_id)),
+      variant_id: new mongoose.Types.ObjectId(item.variant_id),
+      quantity: item.quantity,
+    }));
+
+    const products = await Product.aggregate([
+      // Unwind product_variants to process each variant as a separate document
+      {
+        $unwind: {
+          path: "$product_variants",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+      // Match each product_id and variant_id pair explicitly
+      {
+        $match: {
+          $expr: {
+            $or: orderProducts.map((item) => ({
+              $and: [
+                { $eq: ["$_id", item.product_id] },
+                { $eq: ["$product_variants._id", item.variant_id] },
+              ],
+            })),
+          },
+        },
+      },
+      // Add the quantity from orderProducts by mapping each pair
+      {
+        $addFields: {
+          quantity: {
+            $reduce: {
+              input: orderProducts,
+              initialValue: 0,
+              in: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $eq: ["$$this.product_id", "$_id"] },
+                      { $eq: ["$$this.variant_id", "$product_variants._id"] },
+                    ],
+                  },
+                  then: "$$this.quantity",
+                  else: "$$value",
+                },
+              },
+            },
+          },
+        },
+      },
+      // Group by product and pick the first matching variant
+      {
+        $group: {
+          _id: "$_id",
+          product_name: { $first: "$product_name" },
+          product_slug: { $first: "$product_slug" },
+          product_variant: { $first: "$product_variants" },
+          quantity: { $first: "$quantity" },
+        },
+      },
+      // Project only the required fields
+      {
+        $project: {
+          _id: 1,
+          product_name: 1,
+          product_slug: 1,
+          product_variant: 1,
+          quantity: 1,
+        },
+      },
+    ]);
+
+    if (!products.length) return notFound(res, {});
+
+    const returnedProducts = products.map((product) => ({
+      ...product,
+      _id: undefined,
+      product_hashed_id: encryptData(product._id.toString()),
+    }));
+
+    return ok(res, { products: returnedProducts });
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res, { error: err.message });
   }
 };
