@@ -84,46 +84,43 @@ export const createPaymentLink = async (req, res) => {
 export const handlePaymentWebhook = async (req, res) => {
   try {
     console.log("webhookData1", req.body);
-    const webhookData = payos.verifyPaymentWebhookData(req.body);
-    console.log("webhookData2", webhookData);
-    if (!webhookData) return res.status(400);
 
-    const { success, data } = webhookData; // Lấy dữ liệu từ webhook
-    console.log("Webhook received:", webhookData);
-
-    // Sử dụng $regex để tìm order_id chứa orderCode
-    const orderFilter = { order_id: { $regex: data.orderCode, $options: "i" } };
-
-    if (success) {
-      // Cập nhật trạng thái đơn hàng khi thanh toán thành công
-      const order = await Order.findOneAndUpdate(
-        orderFilter, // Tìm kiếm theo regex
-        { order_status: "delivering" }, // Cập nhật trạng thái
-        { new: true } // Trả về bản ghi đã cập nhật
-      );
-
-      if (!order) {
-        console.error("Order not found for orderCode:", data.orderCode);
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      console.log("Order updated successfully:", order);
-    } else {
-      // Cập nhật trạng thái đơn hàng khi thanh toán thất bại
-      const order = await Order.findOneAndUpdate(
-        orderFilter, // Tìm kiếm theo regex
-        { order_status: "unpaid" },
-        { new: true } // Trả về bản ghi đã cập nhật
-      );
-
-      if (!order) {
-        console.error("Order not found for orderCode:", data.orderCode);
-        return res.status(404).json({ message: "Order not found" });
-      }
-
-      console.log("Order updated as failed:", order);
+    // Validate required fields
+    if (!req.body || !req.body.data || !req.body.signature) {
+      console.error("Invalid webhook data:", req.body);
+      return res.status(400).json({ message: "Invalid webhook data" });
     }
 
+    // Verify webhook signature
+    let webhookData;
+    try {
+      webhookData = payos.verifyPaymentWebhookData(req.body);
+    } catch (err) {
+      console.error("Error verifying webhook signature:", err);
+      return res.status(400).json({ message: "Invalid signature" });
+    }
+
+    console.log("webhookData2", webhookData);
+
+    if (!webhookData) return res.status(400).json({ message: "Invalid webhook data" });
+
+    const { success, data } = webhookData; // Extract data
+    console.log("Webhook received:", webhookData);
+
+    // Construct regex-based filter
+    const orderFilter = { order_id: { $regex: data.orderCode, $options: "i" } };
+
+    // Process order based on success
+    const update = success ? { order_status: "delivering" } : { order_status: "unpaid" };
+
+    const order = await Order.findOneAndUpdate(orderFilter, update, { new: true });
+
+    if (!order) {
+      console.error("Order not found for orderCode:", data.orderCode);
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    console.log(success ? "Order updated successfully:" : "Order update failed:", order);
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
     console.error("Error processing webhook:", error);
