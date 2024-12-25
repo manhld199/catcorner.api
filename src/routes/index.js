@@ -2,6 +2,7 @@ import adminRouter from "./admin/index.js";
 import guestRouter from "./guest/index.js";
 import customerRouter from "./customer/index.js";
 import cloudinaryRouter from "./cloudinary/index.js";
+import payosRouter from "./payos/index.js";
 import authRouter from "./auth/index.js";
 import orderRouter from "./order/order.route.js";
 import passport from "../passport.js";
@@ -13,6 +14,7 @@ const route = (app) => {
   app.use("/api/guest", guestRouter);
   app.use("/api/customer", customerRouter);
   app.use("/api/cloudinary", cloudinaryRouter);
+  app.use("/api/payos", payosRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/orders", orderRouter);
   app.use("/api/user", userRouter);
