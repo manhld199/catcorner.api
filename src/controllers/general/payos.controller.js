@@ -9,8 +9,9 @@ export const createPaymentLink = async (req, res) => {
   try {
     // Lấy dữ liệu từ yêu cầu
     const paymentData = req.body;
-    console.log("payyyyyyyyyy", paymentData);
+    // console.log("payyyyyyyyyy", paymentData);
 
+    // Tính toán chi phí cuối cùng
     const finalCost =
       paymentData.order_products.reduce(
         (acc, curr) =>
@@ -18,63 +19,85 @@ export const createPaymentLink = async (req, res) => {
         0
       ) + 1000;
 
-    // console.log("ddddddddd", paymentData.order_id.split(".")[0].slice(3));
+    // Nếu phương thức thanh toán là COD, không tạo liên kết thanh toán
+    if (paymentData.payment_method === "cod") {
+      const newOrder = new Order({
+        ...paymentData,
+        order_products: paymentData.order_products.map((product) => {
+          return {
+            ...product,
+            product_id: new mongoose.Types.ObjectId(
+              decryptData(decodeURIComponent(product.product_hashed_id))
+            ),
+          };
+        }),
+        final_cost: finalCost,
+      });
+      await newOrder.save();
 
-    // Cấu trúc thông tin đơn hàng
-    const order = {
-      orderCode: Number(paymentData.order_id.split(".")[0].slice(3)),
-      amount: finalCost,
-      description: `Đơn hàng ${(paymentData.order_id.split(".") || ["unknow"])[0]}`,
-      buyerName: paymentData.order_buyer.name,
-      buyerPhone: paymentData.order_buyer.phone_number,
-      buyerAddress: `${paymentData.order_buyer.address.street}, ${paymentData.order_buyer.address.ward}, ${paymentData.order_buyer.address.district}, ${paymentData.order_buyer.address.province}`,
-      cancelUrl: paymentData.cancelUrl,
-      returnUrl: paymentData.returnUrl,
-    };
-    // console.log("orderorder", order);
-
-    // Gọi API PayOS để tạo liên kết thanh toán
-    const paymentLink = await payos.createPaymentLink(order);
-    // console.log("paymentLink", paymentLink);
-
-    // Kiểm tra nếu không trả về liên kết
-    if (!paymentLink || !paymentLink.checkoutUrl) {
-      return res.status(500).json({ error: "Failed to generate payment link" });
+      return res.status(200).json({
+        message: "Order created successfully without payment link",
+        orderId: newOrder._id,
+      });
     }
 
-    const newOrder = new Order({
-      ...paymentData,
-      order_products: paymentData.order_products.map((product) => {
-        // console.log("prooooooooo", product);
-        return {
-          ...product,
-          product_id: new mongoose.Types.ObjectId(
-            decryptData(decodeURIComponent(product.product_hashed_id))
-          ),
-        };
-      }),
-      final_cost: finalCost,
-      paymentLink: paymentLink.checkoutUrl,
-    });
-    await newOrder.save();
+    // Nếu phương thức thanh toán là "onl", tạo liên kết thanh toán
+    if (paymentData.payment_method === "onl") {
+      const order = {
+        orderCode: Number(paymentData.order_id.split(".")[0].slice(3)),
+        amount: finalCost,
+        description: `Đơn hàng ${(paymentData.order_id.split(".") || ["unknow"])[0]}`,
+        buyerName: paymentData.order_buyer.name,
+        buyerPhone: paymentData.order_buyer.phone_number,
+        buyerAddress: `${paymentData.order_buyer.address.street}, ${paymentData.order_buyer.address.ward}, ${paymentData.order_buyer.address.district}, ${paymentData.order_buyer.address.province}`,
+        cancelUrl: paymentData.cancel_url,
+        returnUrl: paymentData.return_url,
+      };
 
-    // Trả về chuỗi HTML chứa iframe
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Payment</title>
-      </head>
-      <body style="margin:0;padding:0;overflow:hidden;">
-        <iframe src="${paymentLink.checkoutUrl}" frameborder="0" style="width:100%;height:100vh;border:none;"></iframe>
-      </body>
-      </html>
-    `;
+      // Gọi API PayOS để tạo liên kết thanh toán
+      const paymentLink = await payos.createPaymentLink(order);
 
-    // Gửi HTML tới client
-    res.status(200).send(htmlContent);
+      // Kiểm tra nếu không trả về liên kết
+      if (!paymentLink || !paymentLink.checkoutUrl) {
+        return res.status(500).json({ error: "Failed to generate payment link" });
+      }
+
+      const newOrder = new Order({
+        ...paymentData,
+        order_products: paymentData.order_products.map((product) => {
+          return {
+            ...product,
+            product_id: new mongoose.Types.ObjectId(
+              decryptData(decodeURIComponent(product.product_hashed_id))
+            ),
+          };
+        }),
+        final_cost: finalCost,
+        payment_link: paymentLink.checkoutUrl,
+      });
+      await newOrder.save();
+
+      // Trả về chuỗi HTML chứa iframe
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Payment</title>
+        </head>
+        <body style="margin:0;padding:0;overflow:hidden;">
+          <iframe src="${paymentLink.checkoutUrl}" frameborder="0" style="width:100%;height:100vh;border:none;"></iframe>
+        </body>
+        </html>
+      `;
+
+      // Gửi HTML tới client
+      return res.status(200).send(htmlContent);
+    }
+
+    // Trường hợp phương thức thanh toán không hợp lệ
+    return res.status(400).json({ error: "Invalid payment method" });
   } catch (error) {
     console.error("Error creating payment link:", error);
     res.status(500).json({ error: "An error occurred while creating the payment link" });
