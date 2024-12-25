@@ -83,8 +83,9 @@ export const createPaymentLink = async (req, res) => {
 
 export const handlePaymentWebhook = async (req, res) => {
   try {
+    console.log("webhookData1", req.body);
     const webhookData = payos.verifyPaymentWebhookData(req.body);
-
+    console.log("webhookData2", webhookData);
     if (!webhookData) return res.status(400);
 
     const { success, data } = webhookData; // Lấy dữ liệu từ webhook
