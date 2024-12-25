@@ -98,7 +98,7 @@ export const handlePaymentWebhook = async (req, res) => {
       // Cập nhật trạng thái đơn hàng khi thanh toán thành công
       const order = await Order.findOneAndUpdate(
         orderFilter, // Tìm kiếm theo regex
-        { order_status: "delivered", payment_status: "success" }, // Cập nhật trạng thái
+        { order_status: "delivering" }, // Cập nhật trạng thái
         { new: true } // Trả về bản ghi đã cập nhật
       );
 
@@ -112,7 +112,7 @@ export const handlePaymentWebhook = async (req, res) => {
       // Cập nhật trạng thái đơn hàng khi thanh toán thất bại
       const order = await Order.findOneAndUpdate(
         orderFilter, // Tìm kiếm theo regex
-        { order_status: "canceled", payment_status: "failed" },
+        { order_status: "unpaid" },
         { new: true } // Trả về bản ghi đã cập nhật
       );
 
