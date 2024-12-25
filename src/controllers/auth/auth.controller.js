@@ -154,7 +154,10 @@ export const login = async (req, res) => {
         user_id: user._id,
         name: user.user_name,
         user_roles: user.user_role,
-        user_avt: user.user_avt || null, // Thêm user_avt vào token
+        user_avt: user.user_avt || null,
+        user_phone_number: user.user_phone_number || null,
+        user_gender: user.user_gender || null,
+        user_birth_day: user.user_birth_day || null,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
@@ -176,7 +179,10 @@ export const login = async (req, res) => {
         name: user.user_name,
         email: user.user_email,
         role: user.user_role,
-        user_avt: user.user_avt || null, // Thêm user_avt vào response
+        user_avt: user.user_avt || null,
+        user_phone_number: user.user_phone_number || null,
+        user_gender: user.user_gender || null,
+        user_birth_day: user.user_birth_day || null,
       },
       expiresIn: 3600, // 1 giờ
       refreshToken,
@@ -303,6 +309,9 @@ export const getMe = async (req, res) => {
         email: user.user_email,
         role: user.user_role,
         user_avt: user.user_avt || null, // Thêm user_avt vào response
+        user_phone_number: user.user_phone_number || null,
+        user_gender: user.user_gender || null,
+        user_birth_day: user.user_birth_day || null,
       },
       expiresIn: 3600, // 1 giờ
       refreshToken: user.refresh_token, // Thêm refresh token vào response

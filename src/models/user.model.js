@@ -10,10 +10,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    refresh_token:{type:String, required:false},
+    refresh_token: { type: String, required: false },
     user_phone_number: { type: String },
     user_avt: { type: String },
-    user_sex: { type: String },
+    user_gender: { type: String },
     user_birth_day: { type: Date },
     user_address: [
       {

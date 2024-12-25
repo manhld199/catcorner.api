@@ -8,7 +8,7 @@ import { getCldPublicIdFromUrl } from "../../utils/functions/format.js";
 export const getProfile = async (req, res) => {
   try {
     const userId = req.user.user_id; // Get from decoded token
-    const user = await User.findById(userId).select('-user_password -refresh_token');
+    const user = await User.findById(userId).select("-user_password -refresh_token");
 
     if (!user) {
       return notFound(res, "User not found");
@@ -29,21 +29,21 @@ export const updateProfile = async (req, res) => {
     const avatarFile = req.file;
 
     const allowedUpdates = [
-      'user_name', 
-      'user_avt',
-      'user_sex',
-      'user_birth_day',
-      'user_phone_number'
+      "user_name",
+      "user_avt",
+      "user_gender",
+      "user_birth_day",
+      "user_phone_number",
     ];
-    
+
     const updates = {};
-    
+
     // Xử lý upload ảnh nếu có file mới
     if (avatarFile) {
       try {
         // Tìm user để lấy avatar cũ
         const currentUser = await User.findById(userId);
-        
+
         // Xóa ảnh cũ trên cloudinary nếu có
         if (currentUser.user_avt) {
           const publicId = getCldPublicIdFromUrl(currentUser.user_avt);
@@ -81,16 +81,16 @@ export const updateProfile = async (req, res) => {
     for (const key of Object.keys(updateData)) {
       if (allowedUpdates.includes(key)) {
         // Validate phone number format
-        if (key === 'user_phone_number') {
+        if (key === "user_phone_number") {
           const phoneRegex = /^[0-9]{10,11}$/;
           if (!phoneRegex.test(updateData[key])) {
             validationError = "Invalid phone number format";
             break;
           }
         }
-        
+
         // Validate birth date format
-        if (key === 'user_birth_day') {
+        if (key === "user_birth_day") {
           const date = new Date(updateData[key]);
           if (isNaN(date.getTime())) {
             validationError = "Invalid birth date format";
@@ -98,9 +98,9 @@ export const updateProfile = async (req, res) => {
           }
         }
 
-        // Validate sex
-        if (key === 'user_sex') {
-          const validSexValues = ['Nam', 'Nữ', 'Khác'];
+        // Validate gender
+        if (key === "user_gender") {
+          const validSexValues = ["Nam", "Nữ", "Khác"];
           if (!validSexValues.includes(updateData[key])) {
             validationError = "Invalid sex value";
             break;
@@ -120,23 +120,20 @@ export const updateProfile = async (req, res) => {
       return badRequest(res, "No valid fields to update");
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      updates,
-      { new: true }
-    ).select('-user_password -refresh_token');
+    const updatedUser = await User.findByIdAndUpdate(userId, updates, { new: true }).select(
+      "-user_password -refresh_token"
+    );
 
     if (!updatedUser) {
       return notFound(res, "User not found");
     }
 
-    return ok(res, { 
+    return ok(res, {
       message: "Profile updated successfully",
-      user: updatedUser 
+      user: updatedUser,
     });
-
   } catch (err) {
     console.log("Error:", err);
     return error(res, "Internal server error");
   }
-}; 
+};
