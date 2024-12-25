@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import payos from "../../libs/payOS.js";
 import Order from "../../models/order.model.js";
 import { decryptData } from "../../utils/security.js";
+import crypto from "crypto";
 
 // Hàm xử lý tạo liên kết thanh toán
 export const createPaymentLink = async (req, res) => {
@@ -82,19 +83,17 @@ export const createPaymentLink = async (req, res) => {
 
 export const handlePaymentWebhook = async (req, res) => {
   try {
-    const signature = req.headers["x-payos-signature"];
+    const webhookData = payos.verifyPaymentWebhookData(req.body);
 
-    if (!payos.verifySignature(req.body, signature)) {
-      return res.status(400).json({ message: "Invalid signature" });
-    }
+    if (!webhookData) return res.status(400);
 
-    const { event, data } = req.body; // Lấy dữ liệu từ webhook
-    console.log("Webhook received:", event, data);
+    const { success, data } = webhookData; // Lấy dữ liệu từ webhook
+    console.log("Webhook received:", webhookData);
 
     // Sử dụng $regex để tìm order_id chứa orderCode
     const orderFilter = { order_id: { $regex: data.orderCode, $options: "i" } };
 
-    if (event === "PAYMENT_SUCCESS") {
+    if (success) {
       // Cập nhật trạng thái đơn hàng khi thanh toán thành công
       const order = await Order.findOneAndUpdate(
         orderFilter, // Tìm kiếm theo regex
@@ -108,7 +107,7 @@ export const handlePaymentWebhook = async (req, res) => {
       }
 
       console.log("Order updated successfully:", order);
-    } else if (event === "PAYMENT_FAILED") {
+    } else {
       // Cập nhật trạng thái đơn hàng khi thanh toán thất bại
       const order = await Order.findOneAndUpdate(
         orderFilter, // Tìm kiếm theo regex
