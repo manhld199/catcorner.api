@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 import payos from "../../libs/payOS.js";
 import Order from "../../models/order.model.js";
 import { decryptData } from "../../utils/security.js";
-import crypto from "crypto";
 
 // Hàm xử lý tạo liên kết thanh toán
 export const createPaymentLink = async (req, res) => {
@@ -15,7 +14,7 @@ export const createPaymentLink = async (req, res) => {
     const finalCost =
       paymentData.order_products.reduce(
         (acc, curr) =>
-          acc + curr.quantity + (curr.unit_price * (100 - curr.discount_percent)) / 100,
+          acc + curr.quantity * ((curr.unit_price * (100 - curr.discount_percent)) / 100),
         0
       ) + 1000;
 
