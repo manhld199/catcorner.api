@@ -106,7 +106,7 @@ export const createPaymentLink = async (req, res) => {
 
 export const handlePaymentWebhook = async (req, res) => {
   try {
-    console.log("webhookData1", req.body);
+    // console.log("webhookData1", req.body);
 
     // Validate required fields
     if (!req.body || !req.body.data || !req.body.signature) {
@@ -123,27 +123,30 @@ export const handlePaymentWebhook = async (req, res) => {
       return res.status(400).json({ message: "Invalid signature" });
     }
 
-    console.log("webhookData2", webhookData);
+    // console.log("webhookData2", webhookData);
 
     if (!webhookData) return res.status(400).json({ message: "Invalid webhook data" });
 
-    const { success, data } = webhookData; // Extract data
-    console.log("Webhook received:", webhookData);
+    // console.log("Webhook received:", webhookData);
 
     // Construct regex-based filter
-    const orderFilter = { order_id: { $regex: data.orderCode, $options: "i" } };
+    const orderFilter = { order_id: { $regex: webhookData.orderCode, $options: "i" } };
 
     // Process order based on success
-    const update = success ? { order_status: "delivering" } : { order_status: "unpaid" };
+    const update =
+      webhookData.code == "00" ? { order_status: "delivering" } : { order_status: "unpaid" };
 
     const order = await Order.findOneAndUpdate(orderFilter, update, { new: true });
 
     if (!order) {
-      console.error("Order not found for orderCode:", data.orderCode);
+      console.error("Order not found for orderCode:", webhookData.orderCode);
       return res.status(404).json({ message: "Order not found" });
     }
 
-    console.log(success ? "Order updated successfully:" : "Order update failed:", order);
+    console.log(
+      webhookData.code == "00" ? "Order updated successfully:" : "Order update failed:",
+      order
+    );
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
     console.error("Error processing webhook:", error);
