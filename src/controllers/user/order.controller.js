@@ -470,7 +470,6 @@ export const trackOrder = async (req, res) => {
 };
 
 // [GET] /api/orders/getOrder/:orderId
-// [GET] /api/orders/getOrder/:orderId
 export const getOrderByOrderId = async (req, res) => {
   try {
     const { orderId } = req.params;
@@ -598,5 +597,41 @@ export const getOrderByOrderId = async (req, res) => {
       success: false,
       message: "Internal server error",
     });
+  }
+};
+
+// [PUT] /api/orders/cancel/:id
+export const cancelOrder = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    console.log("Order ID from params:", orderId); // Kiểm tra giá trị của orderId
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "Order ID is required." });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({ success: false, message: "Invalid order ID." });
+    }
+
+    const order = await Order.findOne({ _id: orderId });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found or you don't have permission to update this order.",
+      });
+    }
+
+    // Cập nhật trạng thái đơn hàng thành "Đã hủy"
+    await Order.updateOne(
+      { _id: orderId },
+      { $set: { order_status: "cancel" } } // Cập nhật trạng thái thành "Đã hủy"
+    );
+
+    return res.status(200).json({ success: true, message: "Order status updated to 'canceled'." });
+  } catch (err) {
+    console.error("Error updating order status:", err);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
