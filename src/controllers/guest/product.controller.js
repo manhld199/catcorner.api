@@ -5,16 +5,16 @@ import { notFound, ok, error } from "../../handlers/respone.handler.js";
 // [GET] /api/guest/product/
 export const getProducts = async (req, res, next) => {
   try {
-    const { 
-      sort = "latest",  // latest | rating
-      page = 1, 
+    const {
+      sort = "latest", // latest | rating
+      page = 1,
       limit = 12,
-      category_id
+      category_id,
     } = req.query;
 
     // Xây dựng query cơ bản
     let query = {};
-    
+
     // Thêm filter theo category nếu có
     if (category_id) {
       query.categories = category_id;
@@ -40,8 +40,8 @@ export const getProducts = async (req, res, next) => {
           from: "categories",
           localField: "category_id",
           foreignField: "_id",
-          as: "category_info"
-        }
+          as: "category_info",
+        },
       },
       {
         $lookup: {
@@ -51,29 +51,29 @@ export const getProducts = async (req, res, next) => {
             {
               $match: {
                 $expr: {
-                  $in: ["$$productId", "$order_products.product_id"]
-                }
-              }
+                  $in: ["$$productId", "$order_products.product_id"],
+                },
+              },
             },
             {
-              $unwind: "$order_products"
+              $unwind: "$order_products",
             },
             {
               $match: {
                 $expr: {
-                  $eq: ["$order_products.product_id", "$$productId"]
-                }
-              }
+                  $eq: ["$order_products.product_id", "$$productId"],
+                },
+              },
             },
             {
               $group: {
                 _id: null,
-                total_sold: { $sum: "$order_products.quantity" }
-              }
-            }
+                total_sold: { $sum: "$order_products.quantity" },
+              },
+            },
           ],
-          as: "order_stats"
-        }
+          as: "order_stats",
+        },
       },
       {
         $addFields: {
@@ -81,20 +81,20 @@ export const getProducts = async (req, res, next) => {
             $cond: [
               { $eq: ["$product_rating.rating_count", 0] },
               0,
-              { $divide: ["$product_rating.rating_point", "$product_rating.rating_count"] }
-            ]
+              { $divide: ["$product_rating.rating_point", "$product_rating.rating_count"] },
+            ],
           },
           highest_discount: {
-            $max: "$product_variants.variant_discount_percent"
+            $max: "$product_variants.variant_discount_percent",
           },
           product_sold_quantity: {
             $cond: {
               if: { $gt: [{ $size: "$order_stats" }, 0] },
               then: { $arrayElemAt: ["$order_stats.total_sold", 0] },
-              else: 0
-            }
-          }
-        }
+              else: 0,
+            },
+          },
+        },
       },
       {
         $project: {
@@ -108,7 +108,7 @@ export const getProducts = async (req, res, next) => {
           product_sold_quantity: 1,
           category: {
             _id: { $arrayElemAt: ["$category_info._id", 0] },
-            name: { $arrayElemAt: ["$category_info.category_name", 0] }
+            name: { $arrayElemAt: ["$category_info.category_name", 0] },
           },
           product_variants: {
             $map: {
@@ -125,20 +125,20 @@ export const getProducts = async (req, res, next) => {
                     {
                       $multiply: [
                         "$$variant.variant_price",
-                        { $divide: ["$$variant.variant_discount_percent", 100] }
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
+                        { $divide: ["$$variant.variant_discount_percent", 100] },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
           },
-          createdAt: 1
-        }
+          createdAt: 1,
+        },
       },
       { $sort: sortOption },
       { $skip: (parseInt(page) - 1) * parseInt(limit) },
-      { $limit: parseInt(limit) }
+      { $limit: parseInt(limit) },
     ]);
 
     // Đếm tổng số sản phẩm để phân trang
@@ -150,15 +150,15 @@ export const getProducts = async (req, res, next) => {
         current_page: parseInt(page),
         total_pages: Math.ceil(totalProducts / limit),
         total_items: totalProducts,
-        items_per_page: parseInt(limit)
-      }
+        items_per_page: parseInt(limit),
+      },
     });
-
   } catch (err) {
     console.log("Err: " + err);
     return error(res);
   }
 };
+
 // [GET] /api/guest/product/:pid
 export const getProduct = async (req, res, next) => {
   try {

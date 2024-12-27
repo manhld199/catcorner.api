@@ -12,7 +12,7 @@ export const getCartProducts = async (req, res, next) => {
       quantity: item.quantity,
     }));
 
-    // Truy xuất dữ liệu từ MongoDB
+    // // Truy xuất dữ liệu từ MongoDB
     const cartProducts = await Product.aggregate([
       {
         $addFields: {

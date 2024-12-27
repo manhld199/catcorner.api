@@ -471,3 +471,65 @@ export const getOrderProducts = async (req, res) => {
     return error(res, { error: err.message });
   }
 };
+
+export const getProductsByCategory = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+    const decryptedCategoryId = decryptData(categoryId);
+    console.log("decryptedCategoryId", decryptedCategoryId);
+
+    if (!mongoose.Types.ObjectId.isValid(decryptedCategoryId)) {
+      return res.status(400).json({ success: false, message: "Invalid category ID." });
+    }
+
+    const products = await Product.find({
+      category_id: new mongoose.Types.ObjectId(decryptedCategoryId),
+    })
+      .select(
+        "product_name product_slug product_imgs product_rating product_variants product_sold_quantity"
+      )
+      .populate({
+        path: "category_id",
+        select: "category_name",
+      });
+
+    const transformedProducts = products.map((product) => {
+      const lowestPriceVariant = product.product_variants.reduce((minPriceVariant, variant) => {
+        const discountedPrice =
+          (variant.variant_price * (100 - variant.variant_discount_percent)) / 100;
+        if (!minPriceVariant || discountedPrice < minPriceVariant.discountedPrice) {
+          minPriceVariant = {
+            ...variant,
+            discountedPrice,
+            variantPrice: variant.variant_price,
+          };
+        }
+        return minPriceVariant;
+      }, null);
+
+      const variantNames = product.product_variants.map((variant) => variant.variant_name);
+
+      return {
+        product_id_hashed: encryptData(product._id.toString()),
+        product_name: product.product_name,
+        product_slug: product.product_slug,
+        product_avg_rating: product.product_rating,
+        product_img: product.product_imgs[0],
+        product_price: lowestPriceVariant ? lowestPriceVariant.variantPrice : null,
+        lowest_price: lowestPriceVariant?.discountedPrice || null,
+        highest_discount: lowestPriceVariant?.variant_discount_percent || null,
+        product_sold_quantity: product.product_sold_quantity,
+        category_name: product.category_id?.category_name || "Unknown",
+        variant_names: variantNames,
+      };
+    });
+
+    ok(res, transformedProducts, "Trả dữ liệu thành công");
+  } catch (error) {
+    console.error("Error in getProductsByCategory:", error);
+    res.status(500).json({
+      success: false,
+      message: "Đã xảy ra lỗi khi lấy sản phẩm theo danh mục.",
+    });
+  }
+};

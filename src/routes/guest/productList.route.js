@@ -6,6 +6,7 @@ import {
   getSearchRecommended,
   getOrderProducts,
   getSearchResult,
+  getProductsByCategory,
 } from "../../controllers/guest/productList.controller.js";
 
 const router = express.Router();
@@ -29,6 +30,7 @@ router.get("/searchRecommended", encodeURI, getSearchRecommended);
 // Ví dụ: "/search?searchKey=Mèo&category=ABC&sort=ABC&minPrice=100000&maxPrice=500000&rating=4&discount=true&page=2
 router.get("/search", encodeURI, getSearchResult);
 
+router.get("/getProductsByCategory/:categoryId", getProductsByCategory);
 router.post("/getOrderProducts", getOrderProducts);
 
 export default router;
