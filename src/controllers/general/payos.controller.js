@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import payos from "../../libs/payOS.js";
 import Order from "../../models/order.model.js";
 import { decryptData } from "../../utils/security.js";
+import { SHIPPING_COST } from "../../utils/constants/index.js";
 
 // Hàm xử lý tạo liên kết thanh toán
 export const createPaymentLink = async (req, res) => {
@@ -16,7 +17,7 @@ export const createPaymentLink = async (req, res) => {
         (acc, curr) =>
           acc + curr.quantity * ((curr.unit_price * (100 - curr.discount_percent)) / 100),
         0
-      ) + 1000;
+      ) + SHIPPING_COST;
 
     // Nếu phương thức thanh toán là COD, không tạo liên kết thanh toán
     if (paymentData.payment_method === "cod") {

@@ -24,3 +24,25 @@ export const getCategories = async (req, res, next) => {
     return error(res);
   }
 };
+
+// [GET] /api/admin/categories/:categoryId
+export const getCategoryById = async (req, res, next) => {
+  try {
+    const { categoryId } = req.params;
+    const decryptedCategoryId = decryptData(categoryId);
+
+    const category = await Category.findById(decryptedCategoryId);
+
+    if (!category) return notFound(res, {});
+
+    const transformedCategory = {
+      ...category.toObject(),
+      category_id_hashed: encryptData(category._id.toString()),
+    };
+
+    return ok(res, transformedCategory);
+  } catch (err) {
+    console.log("Err: " + err);
+    return error(res);
+  }
+};

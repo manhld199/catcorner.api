@@ -15,7 +15,7 @@ export const getCartProducts = async (req, res, next) => {
       quantity: item.quantity,
     }));
 
-    console.log("cart", cart);
+    // console.log("cart", cart);
 
     const cartProducts = await Product.aggregate([
       {
