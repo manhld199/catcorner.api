@@ -6,11 +6,16 @@ import { decryptData } from "../../utils/security.js";
 // [POST] /api/customer/cart
 export const getCartProducts = async (req, res, next) => {
   try {
+    // console.log("dcccccccccc", req.body);
+    // console.log("dddddd", decryptData(req.body[0].product_id));
+
     const cart = req.body.map((item) => ({
-      product_id: new mongoose.Types.ObjectId(decryptData(decodeURIComponent(item.product_id))),
+      product_id: new mongoose.Types.ObjectId(decryptData(item.product_id)),
       variant_id: new mongoose.Types.ObjectId(item.variant_id),
       quantity: item.quantity,
     }));
+
+    console.log("cart", cart);
 
     const cartProducts = await Product.aggregate([
       {
