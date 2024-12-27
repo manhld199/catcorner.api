@@ -224,6 +224,17 @@ export const getSearchRecommended = async (req, res) => {
 export const getSearchResult = async (req, res) => {
   try {
     let { searchKey, category, rating, minPrice, maxPrice, sortBy, discount, page } = req.query;
+    // console.log("{ searchKey, category, rating, minPrice, maxPrice, sortBy, discount, page }", {
+    //   searchKey,
+    //   category,
+    //   rating,
+    //   minPrice,
+    //   maxPrice,
+    //   sortBy,
+    //   discount,
+    //   page,
+    // });
+
     const perPage = 20;
     const pageNumber = parseInt(page) || 1;
 
@@ -244,9 +255,11 @@ export const getSearchResult = async (req, res) => {
     }
 
     // Lọc theo danh mục
-    if (category) {
-      if (mongoose.Types.ObjectId.isValid(category)) {
-        searchConditions["category_id"] = mongoose.Types.ObjectId(category);
+    const decryptedCategory = category ? decryptData(category) : undefined;
+    // console.log("decryptedCategory", decryptedCategory);
+    if (decryptedCategory) {
+      if (mongoose.Types.ObjectId.isValid(decryptedCategory)) {
+        searchConditions["category_id"] = new mongoose.Types.ObjectId(decryptedCategory);
       } else {
         searchConditions["category_id.name"] = { $regex: category, $options: "i" };
       }
@@ -254,8 +267,9 @@ export const getSearchResult = async (req, res) => {
 
     // Lọc theo xếp hạng
     if (rating) {
-      const minRating = parseFloat(rating) - 0.2;
-      const maxRating = parseFloat(rating) + 0.99;
+      const minRating = parseFloat(rating) - 0.5;
+      const maxRating = parseFloat(rating) + 0.5;
+      // console.log("minRating,maxRating", minRating, maxRating);
       searchConditions["product_rating.rating_point"] = { $gte: minRating, $lt: maxRating };
     }
 
