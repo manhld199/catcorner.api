@@ -1,32 +1,28 @@
 import mongoose from "mongoose";
 import Product from "../../models/product.model.js";
-import { ok, notFound } from "../../handlers/respone.handler.js";
-import { decryptData } from "../../utils/security.js";
+import { ok, notFound, error } from "../../handlers/respone.handler.js";
+import { decryptData, encryptData } from "../../utils/security.js";
 
-// [GET] /api/guest/cart
 export const getCartProducts = async (req, res, next) => {
   try {
-    // console.log("dcccccccccc", req.body);
-    // console.log("dddddd", decryptData(req.body[0].product_id));
-
+    // Chuẩn bị dữ liệu từ client (decrypt các product_hashed_id)
     const cart = req.body.map((item) => ({
-      product_id: new mongoose.Types.ObjectId(decryptData(item.product_id)),
+      product_id: new mongoose.Types.ObjectId(decryptData(item.product_hashed_id)),
       variant_id: new mongoose.Types.ObjectId(item.variant_id),
       quantity: item.quantity,
     }));
 
-    // console.log("cart", cart);
-
+    // // Truy xuất dữ liệu từ MongoDB
     const cartProducts = await Product.aggregate([
       {
         $addFields: {
-          cartData: cart, // Thêm giỏ hàng vào sản phẩm
+          cartData: cart, // Thêm dữ liệu giỏ hàng vào sản phẩm
         },
       },
       {
         $match: {
           $expr: {
-            $in: ["$_id", cart.map((item) => item.product_id)], // Lọc sản phẩm theo product_id trong giỏ hàng
+            $in: ["$_id", cart.map((item) => item.product_id)], // Lọc theo product_id trong giỏ hàng
           },
         },
       },
@@ -56,13 +52,17 @@ export const getCartProducts = async (req, res, next) => {
       },
     ]);
 
-    // console.log("cartProducts", cartProducts);
-    // console.log("cartProducts", cartProducts.length);
-
     if (!cartProducts.length) return notFound(res, {});
 
-    return ok(res, { products: cartProducts });
+    // Mã hóa product_id trước khi trả về
+    const response = cartProducts.map((product) => ({
+      ...product,
+      product_hashed_id: encryptData(product.product_id.toString()),
+    }));
+
+    return ok(res, { products: response });
   } catch (err) {
-    console.log("Err: " + err);
+    console.error("Error in getCartProducts:", err);
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
