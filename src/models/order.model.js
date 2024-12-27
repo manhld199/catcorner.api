@@ -33,7 +33,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["unpaid", "delivering", "delivered", "canceled"],
       default: "unpaid",
     },
-    paymentLink: { type: String, required: true },
+    payment_link: { type: String },
   },
   { timestamps: true }
 );
