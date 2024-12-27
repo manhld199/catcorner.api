@@ -219,9 +219,8 @@ export const getOrderById = async (req, res) => {
     const { id } = req.params;
     const user_id = req.user.user_id;
 
-    // Log đầu vào
-    console.log("Request Params ID:", id);
-    console.log("User ID:", user_id);
+    // console.log("Request Params ID:", id);
+    // console.log("User ID:", user_id);
 
     // Validate ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -331,7 +330,7 @@ export const getOrderById = async (req, res) => {
     }
 
     // Log kết quả
-    console.log("Order Found:", JSON.stringify(order[0], null, 2));
+    // console.log("Order Found:", JSON.stringify(order[0], null, 2));
 
     // Trả về kết quả
     return ok(res, { order: order[0] });
@@ -349,6 +348,9 @@ export const trackOrder = async (req, res) => {
   try {
     const { order_id, phone_number } = req.query;
 
+    // console.log("Order ID:", order_id);
+    // console.log("Phone Number:", phone_number);
+
     // Kiểm tra đầu vào
     if (!order_id || !phone_number) {
       return res.status(400).json({ message: "Order ID và số điện thoại là bắt buộc" });
@@ -361,7 +363,7 @@ export const trackOrder = async (req, res) => {
     }
 
     // Xây dựng biểu thức regex cho order_id
-    const orderIdPattern = `^#${order_id}\\..*${phone_number}.*`;
+    const orderIdPattern = new RegExp(`^${order_id}\\..*`);
 
     const order = await Order.aggregate([
       {
@@ -418,7 +420,7 @@ export const trackOrder = async (req, res) => {
           "order_products.variant_img": { $arrayElemAt: ["$product_info.variant.variant_img", 0] },
           "order_products.total_price": {
             $multiply: ["$order_products.unit_price", "$order_products.quantity"],
-          }, // Tính tổng giá tiền cho mỗi sản phẩm
+          },
         },
       },
       {
@@ -449,14 +451,12 @@ export const trackOrder = async (req, res) => {
               product_img: "$order_products.product_img",
               variant_name: "$order_products.variant_name",
               variant_img: "$order_products.variant_img",
-              total_price: "$order_products.total_price", // Tổng giá của từng sản phẩm
+              total_price: "$order_products.total_price",
             },
           },
         },
       },
     ]);
-
-    // console.log("aaaaaaaaaaaaaaaaaaaaaa", order);
 
     if (!order || order.length === 0) {
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
@@ -466,5 +466,137 @@ export const trackOrder = async (req, res) => {
   } catch (err) {
     console.error("Lỗi khi tra cứu đơn hàng:", err);
     return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+// [GET] /api/orders/getOrder/:orderId
+// [GET] /api/orders/getOrder/:orderId
+export const getOrderByOrderId = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // console.log("Request Params orderId:", orderId);
+
+    // Validate orderId
+    if (!orderId || typeof orderId !== "string") {
+      console.error("Invalid order ID format");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID format",
+      });
+    }
+
+    // Aggregation pipeline
+    const order = await Order.aggregate([
+      {
+        $match: {
+          order_id: orderId, // Chỉ dựa vào order_id để tìm kiếm
+        },
+      },
+      {
+        $unwind: "$order_products",
+      },
+      {
+        $lookup: {
+          from: "products",
+          let: {
+            productId: "$order_products.product_id",
+            variantId: "$order_products.variant_id",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$productId"] },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                product_name: 1,
+                product_imgs: { $arrayElemAt: ["$product_imgs", 0] },
+                variant: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: "$product_variants",
+                        as: "v",
+                        cond: { $eq: ["$$v._id", "$$variantId"] },
+                      },
+                    },
+                    0,
+                  ],
+                },
+              },
+            },
+          ],
+          as: "product_info",
+        },
+      },
+      {
+        $addFields: {
+          "order_products.product_name": {
+            $arrayElemAt: ["$product_info.product_name", 0],
+          },
+          "order_products.product_img": {
+            $arrayElemAt: ["$product_info.product_imgs", 0],
+          },
+          "order_products.variant_name": {
+            $arrayElemAt: ["$product_info.variant.variant_name", 0],
+          },
+          "order_products.variant_img": {
+            $arrayElemAt: ["$product_info.variant.variant_img", 0],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          order_id: { $first: "$order_id" },
+          user_id: { $first: "$user_id" },
+          order_buyer: { $first: "$order_buyer" },
+          order_note: { $first: "$order_note" },
+          total_products_cost: { $first: "$total_products_cost" },
+          shipping_cost: { $first: "$shipping_cost" },
+          final_cost: { $first: "$final_cost" },
+          order_status: { $first: "$order_status" },
+          createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
+          order_products: {
+            $push: {
+              product_id: "$order_products.product_id",
+              variant_id: "$order_products.variant_id",
+              quantity: "$order_products.quantity",
+              unit_price: "$order_products.unit_price",
+              discount_percent: "$order_products.discount_percent",
+              product_name: "$order_products.product_name",
+              product_img: "$order_products.product_img",
+              variant_name: "$order_products.variant_name",
+              variant_img: "$order_products.variant_img",
+            },
+          },
+        },
+      },
+    ]);
+
+    // Kiểm tra nếu không tìm thấy đơn hàng
+    if (!order || order.length === 0) {
+      console.error("Order not found with order_id:", orderId);
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // Trả về kết quả
+    return res.status(200).json({
+      success: true,
+      data: { order: order[0] },
+    });
+  } catch (err) {
+    console.error("Error fetching order by order_id:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 };

@@ -53,7 +53,8 @@ const decryptData = (encryptedData) => {
   }
 
   // Giải mã chuỗi base64 và tách nonce khỏi dữ liệu mã hóa
-  const decodedData = Buffer.from(encryptedData, "base64");
+  // const decodedData = Buffer.from(encryptedData, "base64");
+  const decodedData = Buffer.from(decodeURIComponent(encryptedData), "base64");
   const nonce = decodedData.slice(0, nacl.box.nonceLength); // Nonce được lưu ở phần đầu
   const cipherText = decodedData.slice(nacl.box.nonceLength); // Dữ liệu mã hóa thực tế
 
