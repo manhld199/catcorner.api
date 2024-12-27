@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 import Product from "../../models/product.model.js";
 import { ok, notFound } from "../../handlers/respone.handler.js";
+import { decryptData } from "../../utils/security.js";
 
 // [GET] /api/guest/cart
 export const getCartProducts = async (req, res, next) => {
   try {
     const cart = req.body.map((item) => ({
-      product_id: new mongoose.Types.ObjectId(item.product_id),
+      product_id: new mongoose.Types.ObjectId(decryptData(decodeURIComponent(item.product_id))),
       variant_id: new mongoose.Types.ObjectId(item.variant_id),
       quantity: item.quantity,
     }));
