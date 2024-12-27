@@ -5,7 +5,11 @@ import mongoose from "mongoose";
 // [GET] /api/orders
 export const getOrders = async (req, res) => {
   try {
-    const user_id = req.user.user_id;
+    const user_id = req.user?.user_id; // Lấy user_id từ request
+    if (!user_id) {
+      return res.status(400).json({ success: false, message: "User ID is required." });
+    }
+
     const {
       status,
       sort = "createdAt",
@@ -17,14 +21,19 @@ export const getOrders = async (req, res) => {
       phone_number = "",
     } = req.query;
 
-    let query = { user_id: user_id };
+    // Kiểm tra và chuyển đổi user_id sang ObjectId
+    if (!mongoose.Types.ObjectId.isValid(user_id)) {
+      return res.status(400).json({ success: false, message: "Invalid User ID." });
+    }
 
-    // Filter by status
+    let query = { user_id: new mongoose.Types.ObjectId(user_id) }; // Dùng 'new' để tạo ObjectId hợp lệ
+
+    // Thêm bộ lọc theo trạng thái
     if (status) {
       query.order_status = status;
     }
 
-    // Filter by order_id
+    // Thêm bộ lọc theo order_id
     if (order_id) {
       query.$expr = {
         $regexMatch: {
@@ -35,7 +44,7 @@ export const getOrders = async (req, res) => {
       };
     }
 
-    // Filter by exact phone number match
+    // Thêm bộ lọc theo số điện thoại
     if (phone_number) {
       query["order_buyer.phone_number"] = phone_number;
     }
@@ -43,12 +52,11 @@ export const getOrders = async (req, res) => {
     const sortObj = {};
     sortObj[sort] = order === "asc" ? 1 : -1;
 
+    // Aggregation pipeline
     const orders = await Order.aggregate([
       { $match: query },
       // Unwind order_products để xử lý từng sản phẩm
-      {
-        $unwind: "$order_products",
-      },
+      { $unwind: "$order_products" },
       // Lookup để lấy thông tin product
       {
         $lookup: {
@@ -86,7 +94,7 @@ export const getOrders = async (req, res) => {
           as: "product_info",
         },
       },
-      // Filter by product_name
+      // Lọc sản phẩm theo product_name
       ...(product_name
         ? [
             {
@@ -116,10 +124,11 @@ export const getOrders = async (req, res) => {
           },
         },
       },
-      // Group lại để khôi phục cấu trúc order ban đầu
+      // Gom nhóm lại
       {
         $group: {
           _id: "$_id",
+          order_id: { $first: "$order_id" },
           user_id: { $first: "$user_id" },
           order_buyer: { $first: "$order_buyer" },
           order_note: { $first: "$order_note" },
@@ -179,30 +188,28 @@ export const getOrders = async (req, res) => {
             },
           ]
         : []),
-      {
-        $group: {
-          _id: "$_id",
-        },
-      },
-      {
-        $count: "total",
-      },
+      { $group: { _id: "$_id" } },
+      { $count: "total" },
     ]);
 
     const totalCount = total.length > 0 ? total[0].total : 0;
 
-    return ok(res, {
-      orders,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: totalCount,
-        total_pages: Math.ceil(totalCount / limit),
+    // Trả về dữ liệu
+    return res.json({
+      success: true,
+      data: {
+        orders,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: totalCount,
+          total_pages: Math.ceil(totalCount / limit),
+        },
       },
     });
   } catch (err) {
-    console.log("Error:", err);
-    return error(res, "Internal server error");
+    console.error("Error in getOrders API:", err); // Log lỗi chi tiết
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
