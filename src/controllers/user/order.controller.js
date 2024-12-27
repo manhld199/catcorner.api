@@ -213,31 +213,41 @@ export const getOrders = async (req, res) => {
   }
 };
 
-// [GET] /api/orders/:id
+// [GET] /api/orders/[:id]
 export const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
     const user_id = req.user.user_id;
+
+    // Log đầu vào
+    console.log("Request Params ID:", id);
+    console.log("User ID:", user_id);
+
+    // Validate ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      console.error("Invalid order ID");
+      return error(res, "Invalid order ID");
+    }
+
     const orderId = new mongoose.Types.ObjectId(id);
 
+    // Aggregation pipeline
     const order = await Order.aggregate([
       {
         $match: {
           _id: orderId,
-          user_id: user_id,
+          user_id: new mongoose.Types.ObjectId(user_id),
         },
       },
-      // Unwind order_products để xử lý từng sản phẩm
       {
         $unwind: "$order_products",
       },
-      // Lookup để lấy thông tin product
       {
         $lookup: {
           from: "products",
           let: {
-            productId: { $toObjectId: "$order_products.product_id" },
-            variantId: { $toObjectId: "$order_products.variant_id" },
+            productId: "$order_products.product_id",
+            variantId: "$order_products.variant_id",
           },
           pipeline: [
             {
@@ -268,7 +278,6 @@ export const getOrderById = async (req, res) => {
           as: "product_info",
         },
       },
-      // Thêm thông tin product vào order_products
       {
         $addFields: {
           "order_products.product_name": {
@@ -285,10 +294,10 @@ export const getOrderById = async (req, res) => {
           },
         },
       },
-      // Group lại để khôi phục cấu tr��c order ban đầu
       {
         $group: {
           _id: "$_id",
+          order_id: { $first: "$order_id" },
           user_id: { $first: "$user_id" },
           order_buyer: { $first: "$order_buyer" },
           order_note: { $first: "$order_note" },
@@ -297,6 +306,7 @@ export const getOrderById = async (req, res) => {
           final_cost: { $first: "$final_cost" },
           order_status: { $first: "$order_status" },
           createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
           order_products: {
             $push: {
               product_id: "$order_products.product_id",
@@ -314,16 +324,19 @@ export const getOrderById = async (req, res) => {
       },
     ]);
 
+    // Kiểm tra nếu không tìm thấy đơn hàng
     if (!order || order.length === 0) {
+      console.error("Order not found with ID:", orderId);
       return notFound(res, "Order not found");
     }
 
-    // Log để debug
-    console.log("Found order:", JSON.stringify(order[0], null, 2));
+    // Log kết quả
+    console.log("Order Found:", JSON.stringify(order[0], null, 2));
 
+    // Trả về kết quả
     return ok(res, { order: order[0] });
   } catch (err) {
-    console.log("Error:", err);
+    console.error("Error fetching order:", err);
     if (err.name === "CastError") {
       return error(res, "Invalid order ID");
     }
