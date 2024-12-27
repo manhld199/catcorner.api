@@ -3,7 +3,7 @@ import Product from "../../models/product.model.js";
 import { ok, notFound } from "../../handlers/respone.handler.js";
 import { decryptData } from "../../utils/security.js";
 
-// [GET] /api/guest/cart
+// [POST] /api/customer/cart
 export const getCartProducts = async (req, res, next) => {
   try {
     const cart = req.body.map((item) => ({
