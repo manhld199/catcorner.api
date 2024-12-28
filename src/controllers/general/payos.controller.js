@@ -49,7 +49,11 @@ export const createPaymentLink = async (req, res) => {
         description: `Đơn hàng ${(paymentData.order_id.split(".") || ["unknow"])[0]}`,
         buyerName: paymentData.order_buyer.name,
         buyerPhone: paymentData.order_buyer.phone_number,
-        buyerAddress: `${paymentData.order_buyer.address.street}, ${paymentData.order_buyer.address.ward}, ${paymentData.order_buyer.address.district}, ${paymentData.order_buyer.address.province}`,
+        buyerAddress: `${paymentData?.order_buyer?.address?.street || "Street"}, ${
+          paymentData?.order_buyer?.address?.ward || "Ward"
+        }, ${paymentData?.order_buyer?.address?.district || "District"}, ${
+          paymentData?.order_buyer?.address?.province || "Province"
+        }`,
         cancelUrl: paymentData.cancel_url,
         returnUrl: paymentData.return_url,
       };
@@ -151,5 +155,49 @@ export const handlePaymentWebhook = async (req, res) => {
   } catch (error) {
     console.error("Error processing webhook:", error);
     res.status(500).json({ message: "Error processing webhook" });
+  }
+};
+
+export const getPaymentLink = async (req, res) => {
+  try {
+    // Lấy orderCode từ yêu cầu
+    const { orderCode } = req.params;
+
+    if (!orderCode) {
+      return res.status(400).json({ error: "Order code is required" });
+    }
+
+    // Tìm đơn hàng dựa trên orderCode
+    const order = await Order.findOne({ order_id: { $regex: orderCode, $options: "i" } });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Kiểm tra xem đơn hàng có liên kết thanh toán không
+    if (!order.payment_link) {
+      return res.status(404).json({ error: "Payment link not found for this order" });
+    }
+
+    // Trả về chuỗi HTML chứa iframe
+    const htmlContent = `
+     <!DOCTYPE html>
+     <html lang="en">
+     <head>
+       <meta charset="UTF-8">
+       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+       <title>Payment</title>
+     </head>
+     <body style="margin:0;padding:0;overflow:hidden;">
+       <iframe src="${order.payment_link}" frameborder="0" style="width:100%;height:100vh;border:none;"></iframe>
+     </body>
+     </html>
+   `;
+
+    // Gửi HTML tới client
+    return res.status(200).send(htmlContent);
+  } catch (error) {
+    console.error("Error fetching payment link:", error);
+    res.status(500).json({ error: "An error occurred while fetching the payment link" });
   }
 };
