@@ -1,6 +1,7 @@
 import Order from "../../models/order.model.js";
 import { ok, error, notFound, badRequest } from "../../handlers/respone.handler.js";
 import mongoose from "mongoose";
+import { decryptData, encryptData } from "../../utils/security.js";
 
 // [GET] /api/orders
 export const getOrders = async (req, res) => {
@@ -194,11 +195,19 @@ export const getOrders = async (req, res) => {
 
     const totalCount = total.length > 0 ? total[0].total : 0;
 
+    const transformedOrders = orders.map((order) => ({
+      ...order,
+      order_products: order.order_products.map((product) => ({
+        ...product,
+        product_hashed_id: encryptData(product.product_id.toString()),
+      })),
+    }));
+
     // Trả về dữ liệu
     return res.json({
       success: true,
       data: {
-        orders,
+        orders: transformedOrders,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -462,7 +471,8 @@ export const trackOrder = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy đơn hàng" });
     }
 
-    return res.status(200).json({ order: order[0] });
+    return ok(res, { order: order[0] }, "Không tìm thấy đơn hàng");
+    // return res.status(200).json({ order: order[0] }, { message: "Thành công" });
   } catch (err) {
     console.error("Lỗi khi tra cứu đơn hàng:", err);
     return res.status(500).json({ message: "Lỗi hệ thống" });
