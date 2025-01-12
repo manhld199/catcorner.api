@@ -19,7 +19,7 @@ const route = (app) => {
   app.use("/api/auth", authRouter);
   app.use("/api/orders", orderRouter);
   app.use("/api/user", userRouter);
-  app.use("/api/location", locationRouter);
+  app.use("/api/locations", locationRouter);
   // init passport
   if (
     process.env.GOOGLE_CLIENT_ID &&

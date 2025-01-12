@@ -132,3 +132,56 @@ const fetchAndSaveWards = async (district_id) => {
     console.error("Error fetching wards:", error);
   }
 };
+
+// Controller: Lấy danh sách tất cả các tỉnh
+export const getProvinces = async (req, res) => {
+  try {
+    const provinces = await Province.find({});
+    res.status(200).json({
+      success: true,
+      results: provinces,
+    });
+  } catch (error) {
+    console.error("Error fetching provinces:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Controller: Lấy danh sách các huyện theo province_id
+export const getDistrictsByProvinceId = async (req, res) => {
+  const { province_id } = req.params;
+  try {
+    const districts = await District.find({ province_id });
+    res.status(200).json({
+      success: true,
+      results: districts,
+    });
+  } catch (error) {
+    console.error(`Error fetching districts for province_id ${province_id}:`, error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Controller: Lấy danh sách các xã/phường theo district_id
+export const getWardsByDistrictId = async (req, res) => {
+  const { district_id } = req.params;
+  try {
+    const wards = await Ward.find({ district_id });
+    res.status(200).json({
+      success: true,
+      results: wards,
+    });
+  } catch (error) {
+    console.error(`Error fetching wards for district_id ${district_id}:`, error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
