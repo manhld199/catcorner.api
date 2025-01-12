@@ -7,6 +7,7 @@ import authRouter from "./auth/index.js";
 import orderRouter from "./order/order.route.js";
 import passport from "../passport.js";
 import userRouter from "./user/user.route.js";
+import locationRouter from "./location/location.route.js";
 
 const route = (app) => {
   app.get("/", (req, res) => res.send("Express on Vercel"));
@@ -18,6 +19,7 @@ const route = (app) => {
   app.use("/api/auth", authRouter);
   app.use("/api/orders", orderRouter);
   app.use("/api/user", userRouter);
+  app.use("/api/locations", locationRouter);
   // init passport
   if (
     process.env.GOOGLE_CLIENT_ID &&
