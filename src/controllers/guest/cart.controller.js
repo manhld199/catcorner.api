@@ -128,10 +128,16 @@ export const getCartProducts = async (req, res, next) => {
   }
 };
 
-// [PUT] /cart
 export const putUserCart = async (req, res, next) => {
   try {
     const { userId, cartProducts } = req.body;
+
+    if (!userId) return badRequest(res, "User id is required");
+
+    // Đảm bảo rằng cartProducts là một mảng hợp lệ
+    if (!Array.isArray(cartProducts) || cartProducts.length === 0) {
+      return badRequest(res, "Cart products are required");
+    }
 
     const cart = cartProducts.map((item) => ({
       product_id: new mongoose.Types.ObjectId(decryptData(item.product_hashed_id)),
@@ -139,15 +145,47 @@ export const putUserCart = async (req, res, next) => {
       quantity: item.quantity,
     }));
 
-    if (!userId) return badRequest(res, "User id is required");
+    // Tìm người dùng và lấy giỏ hàng hiện tại
+    const user = await User.findById(userId);
+    if (!user) return badRequest(res, "User not found");
 
-    const updatedUser = await User.findByIdAndUpdate(userId, { user_cart: cart }, { new: true });
+    // Cập nhật giỏ hàng bằng cách thêm hoặc cập nhật sản phẩm
+    const updatedCart = user.user_cart.map((existingItem) => {
+      const newProduct = cart.find(
+        (item) =>
+          item.product_id.equals(existingItem.product_id) &&
+          item.variant_id.equals(existingItem.variant_id)
+      );
+      if (newProduct) {
+        existingItem.quantity = newProduct.quantity; // Cập nhật số lượng nếu sản phẩm đã có
+        return existingItem;
+      }
+      return existingItem;
+    });
+
+    // Thêm sản phẩm mới vào giỏ hàng nếu nó không có trong giỏ hàng cũ
+    const newItems = cart.filter(
+      (item) =>
+        !updatedCart.some(
+          (existingItem) =>
+            existingItem.product_id.equals(item.product_id) &&
+            existingItem.variant_id.equals(item.variant_id)
+        )
+    );
+    updatedCart.push(...newItems);
+
+    // Cập nhật giỏ hàng trong cơ sở dữ liệu
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { user_cart: updatedCart },
+      { new: true }
+    );
 
     if (!updatedUser) return badRequest(res, "Can not update user cart");
 
     return ok(res, { user_cart: updatedUser.user_cart }, "User cart update successfully");
   } catch (err) {
-    console.error("Error in getCartProducts:", err);
+    console.error("Error in putUserCart:", err);
     return error(res, "Internal Server Error");
   }
 };
