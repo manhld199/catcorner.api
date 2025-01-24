@@ -45,20 +45,49 @@ export const getCoupons = async (req, res, next) => {
   }
 };
 
-// [GET] /api/customer/coupons/:userId
 export const getUserCoupons = async (req, res, next) => {
   try {
     const userId = req.params.userId;
+    let limit = req.query.limit;
 
     if (!userId || userId == "undefined") return badRequest(res, "User ID is required");
+
+    // Kiểm tra giá trị của limit
+    if (limit === "all") {
+      limit = null; // Không áp dụng giới hạn
+    } else if (limit === "default" || !limit) {
+      limit = 10; // Giới hạn mặc định
+    } else {
+      limit = parseInt(limit, 10);
+      if (isNaN(limit) || limit <= 0) {
+        return badRequest(res, "Limit must be a positive number or 'all'");
+      }
+    }
 
     // Lấy thông tin người dùng
     const userInfo = await User.findById(userId).populate("saved_coupons"); // Populate để lấy thông tin chi tiết của coupons
     if (!userInfo) return notFound(res, "User not found");
 
     // Lấy danh sách saved_coupons
-    const userCoupons = userInfo.saved_coupons.map((coupon) => encryptData(coupon.toString()));
-    return ok(res, "User coupons retrieved successfully", userCoupons);
+    const userCoupons = userInfo.saved_coupons;
+
+    // Truy vấn để lấy danh sách coupon có id nằm trong userCoupons
+    const aggregationPipeline = [
+      { $match: { _id: { $in: userCoupons } } }, // Lọc theo _id
+      { $sort: { createdAt: -1 } }, // Sắp xếp giảm dần theo createdAt
+    ];
+
+    if (limit) aggregationPipeline.push({ $limit: limit });
+
+    const coupons = await Coupon.aggregate(aggregationPipeline);
+
+    const hashedCoupons = coupons.map((coupon) => ({
+      ...coupon,
+      coupon_hashed_id: encryptData(coupon._id.toString()),
+      _id: undefined,
+    }));
+
+    return ok(res, hashedCoupons, "User coupons retrieved successfully");
   } catch (err) {
     console.error("Error:", err);
     return error(res);
