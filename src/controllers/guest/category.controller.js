@@ -4,7 +4,7 @@ import Category from "../../models/category.model.js";
 import { notFound, ok, error, created } from "../../handlers/respone.handler.js";
 import { encryptData, decryptData } from "../../utils/security.js";
 
-// [GET] / api/admin/categories
+// [GET] / api/categories
 export const getCategories = async (req, res, next) => {
   try {
     const categories = await Category.aggregate([{ $match: {} }, { $sort: { createdAt: -1 } }]);
@@ -25,7 +25,7 @@ export const getCategories = async (req, res, next) => {
   }
 };
 
-// [GET] /api/admin/categories/:categoryId
+// [GET] /api/categories/:categoryId
 export const getCategoryById = async (req, res, next) => {
   try {
     const { categoryId } = req.params;

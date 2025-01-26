@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Product from "../../models/product.model.js";
+import Category from "../../models/category.model.js";
 import { ok, notFound, error } from "../../handlers/respone.handler.js";
 import { decryptData, encryptData } from "../../utils/security.js";
 
@@ -67,7 +68,7 @@ export const getTopRatedProducts = async (req, res) => {
       )
       .populate({
         path: "category_id",
-        select: "category_name", // Lấy tên danh mục
+        select: "category_name",
       });
 
     const transformedProducts = topRatedProducts.map((product) => {
@@ -224,26 +225,22 @@ export const getSearchRecommended = async (req, res) => {
 export const getSearchResult = async (req, res) => {
   try {
     let { searchKey, category, rating, minPrice, maxPrice, sortBy, discount, page } = req.query;
-    // console.log("{ searchKey, category, rating, minPrice, maxPrice, sortBy, discount, page }", {
-    //   searchKey,
-    //   category,
-    //   rating,
-    //   minPrice,
-    //   maxPrice,
-    //   sortBy,
-    //   discount,
-    //   page,
-    // });
 
-    const perPage = 20;
-    const pageNumber = parseInt(page) || 1;
+    // Chuyển đổi các giá trị từ query
+    minPrice = minPrice ? parseInt(minPrice) : undefined;
+    maxPrice = maxPrice ? parseInt(maxPrice) : undefined;
+    page = page ? parseInt(page) : 1;
+    discount = discount === "true";
+
+    const perPage = 12;
+    const pageNumber = page;
 
     let searchConditions = {};
 
     // Tìm kiếm theo từ khóa
     if (searchKey) {
       searchKey = searchKey.replace(/\s+/g, "(^\\s.+)|");
-      let searchKeySlug = searchKey.replace(/\s+/g, "-");
+      const searchKeySlug = searchKey.replace(/\s+/g, "-");
 
       searchConditions.$or = [
         { product_name: { $regex: searchKey, $options: "i" } },
@@ -254,27 +251,26 @@ export const getSearchResult = async (req, res) => {
       ];
     }
 
-    // Lọc theo danh mục
-    const decryptedCategory = category ? decryptData(category) : undefined;
-    // console.log("decryptedCategory", decryptedCategory);
-    if (decryptedCategory) {
-      if (mongoose.Types.ObjectId.isValid(decryptedCategory)) {
-        searchConditions["category_id"] = new mongoose.Types.ObjectId(decryptedCategory);
-      } else {
-        searchConditions["category_id.name"] = { $regex: category, $options: "i" };
-      }
+    // Lọc theo danh mục (hỗ trợ nhiều danh mục)
+    if (category) {
+      const categoryNames = category.split(",");
+      const categories = await Category.find({ category_name: { $in: categoryNames } }).select(
+        "_id"
+      );
+      const categoryIds = categories.map((cat) => cat._id);
+      searchConditions["category_id"] = { $in: categoryIds };
     }
 
-    // Lọc theo xếp hạng
+    // Lọc theo xếp hạng (áp dụng nguyên tắc làm tròn rating)
     if (rating) {
-      const minRating = parseFloat(rating) - 0.5;
-      const maxRating = parseFloat(rating) + 0.5;
-      // console.log("minRating,maxRating", minRating, maxRating);
-      searchConditions["product_rating.rating_point"] = { $gte: minRating, $lt: maxRating };
+      const ratings = rating.split(",").map((r) => parseInt(r, 10)); // Chuyển đổi về số nguyên
+      searchConditions["$or"] = ratings.map((r) => ({
+        "product_rating.rating_point": { $gte: r - 0.5, $lt: r + 0.5 },
+      }));
     }
 
     // Lọc theo giá
-    if (minPrice && maxPrice) {
+    if (minPrice !== undefined && maxPrice !== undefined) {
       searchConditions["product_variants.variant_price"] = { $gte: minPrice, $lte: maxPrice };
     }
 
@@ -285,16 +281,15 @@ export const getSearchResult = async (req, res) => {
 
     // Sắp xếp
     let sortOptions = {};
-    if (sortBy === "hot") {
-      sortOptions = { "product_rating.rating_point": -1, product_sold_quantity: -1 };
-    } else if (sortBy === "new") {
-      sortOptions = { createdAt: -1 };
-    } else if (sortBy === "sale") {
-      sortOptions = { product_sold_quantity: -1 };
-    } else if (sortBy === "price-z-to-a") {
-      sortOptions["product_variants.variant_price"] = -1;
-    } else if (sortBy === "price-a-to-z") {
-      sortOptions["product_variants.variant_price"] = 1;
+
+    if (sortBy === "recent") {
+      sortOptions = { createdAt: -1 }; // Sắp xếp theo ngày tạo mới nhất
+    } else if (sortBy === "low-to-high") {
+      sortOptions = { "product_variants.variant_price": 1 }; // Giá thấp đến cao
+    } else if (sortBy === "high-to-low") {
+      sortOptions = { "product_variants.variant_price": -1 }; // Giá cao đến thấp
+    } else if (sortBy === "best-rating") {
+      sortOptions = { "product_rating.rating_point": -1 }; // Đánh giá cao
     }
 
     // Tính toán phân trang
@@ -314,21 +309,14 @@ export const getSearchResult = async (req, res) => {
 
     // Xử lý sản phẩm trả về
     const transformedProducts = products.map((product) => {
-      if (!product._id) {
-        console.error("Missing product ID for product:", product);
-        return null;
-      }
+      if (!product._id) return null;
 
       const lowestPriceVariant = product.product_variants
         ? product.product_variants.reduce((minPriceVariant, variant) => {
             const discountedPrice =
-              variant.variant_price * (1 - variant.variant_discount_percent / 100);
+              variant.variant_price * (1 - (variant.variant_discount_percent || 0) / 100);
             if (!minPriceVariant || discountedPrice < minPriceVariant.discountedPrice) {
-              minPriceVariant = {
-                ...variant,
-                discountedPrice,
-                variantPrice: variant.variant_price,
-              };
+              return { ...variant, discountedPrice, variantPrice: variant.variant_price };
             }
             return minPriceVariant;
           }, null)
@@ -340,7 +328,7 @@ export const getSearchResult = async (req, res) => {
               !maxDiscountVariant ||
               variant.variant_discount_percent > maxDiscountVariant.variant_discount_percent
             ) {
-              maxDiscountVariant = variant;
+              return variant;
             }
             return maxDiscountVariant;
           }, null)
@@ -349,25 +337,23 @@ export const getSearchResult = async (req, res) => {
       const variantNames = product.product_variants.map((variant) => variant.variant_name);
 
       return {
-        product_id_hashed: encryptData(product._id.toString()), // Đảm bảo _id là chuỗi
+        product_id_hashed: encryptData(product._id.toString()),
         product_name: product.product_name,
         product_slug: product.product_slug,
         product_avg_rating: product.product_rating?.rating_point,
         product_img: product.product_imgs[0],
-        lowest_price: lowestPriceVariant ? lowestPriceVariant.discountedPrice : null,
-        product_price: lowestPriceVariant ? lowestPriceVariant.variantPrice : null,
-        highest_discount: highestDiscountVariant
-          ? highestDiscountVariant.variant_discount_percent
-          : null,
+        lowest_price: lowestPriceVariant?.discountedPrice || null,
+        product_price: lowestPriceVariant?.variantPrice || null,
+        highest_discount: highestDiscountVariant?.variant_discount_percent || null,
         product_sold_quantity: product.product_sold_quantity,
-        category_name: product.category_id?.category_name,
+        category_name: product.category_id?.category_name || null,
         variant_name: variantNames,
       };
     });
 
     res.status(200).json({
       success: true,
-      data: transformedProducts,
+      data: transformedProducts.filter((p) => p !== null),
       pagination: {
         totalPages,
         currentPage: pageNumber,
@@ -390,7 +376,6 @@ export const getOrderProducts = async (req, res) => {
       variant_id: new mongoose.Types.ObjectId(item.variant_id),
       quantity: item.quantity,
     }));
-
     const products = await Product.aggregate([
       // Unwind product_variants to process each variant as a separate document
       {
@@ -530,6 +515,49 @@ export const getProductsByCategory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Đã xảy ra lỗi khi lấy sản phẩm theo danh mục.",
+    });
+  }
+};
+
+export const getProductsGroupedByCategory = async (req, res) => {
+  try {
+    const productsGrouped = await Product.aggregate([
+      {
+        $group: {
+          _id: "$category_id", // Nhóm theo category_id
+          productCount: { $sum: 1 }, // Đếm số lượng sản phẩm
+        },
+      },
+      {
+        $lookup: {
+          from: "categories", // Tên collection chứa danh mục (categories)
+          localField: "_id", // category_id từ sản phẩm
+          foreignField: "_id", // _id từ danh mục
+          as: "category", // Tên trường mới chứa thông tin danh mục
+        },
+      },
+      {
+        $unwind: "$category", // Giải phóng mảng danh mục thành object
+      },
+      {
+        $project: {
+          categoryId: "$_id", // Đặt lại tên cho _id là categoryId
+          categoryName: "$category.category_name", // Lấy tên danh mục
+          productCount: 1, // Số lượng sản phẩm
+        },
+      },
+    ]);
+
+    if (!productsGrouped.length) {
+      return notFound(res, "Không có sản phẩm nào được tìm thấy.");
+    }
+
+    ok(res, productsGrouped, "Trả dữ liệu thành công");
+  } catch (error) {
+    console.error("Error in getProductsGroupedByCategory:", error);
+    res.status(500).json({
+      success: false,
+      message: "Đã xảy ra lỗi khi lấy sản phẩm theo nhóm danh mục.",
     });
   }
 };

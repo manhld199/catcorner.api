@@ -2,7 +2,7 @@ import Product from "../../models/product.model.js";
 import { encryptData, decryptData } from "../../utils/security.js";
 import { notFound, ok, error } from "../../handlers/respone.handler.js";
 
-// [GET] /api/guest/product/
+// [GET] /api/guest/product
 export const getProducts = async (req, res, next) => {
   try {
     const {
