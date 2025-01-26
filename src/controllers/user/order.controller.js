@@ -133,7 +133,6 @@ export const getOrders = async (req, res) => {
           user_id: { $first: "$user_id" },
           order_buyer: { $first: "$order_buyer" },
           order_note: { $first: "$order_note" },
-          total_products_cost: { $first: "$total_products_cost" },
           shipping_cost: { $first: "$shipping_cost" },
           final_cost: { $first: "$final_cost" },
           order_status: { $first: "$order_status" },
@@ -309,7 +308,6 @@ export const getOrderById = async (req, res) => {
           user_id: { $first: "$user_id" },
           order_buyer: { $first: "$order_buyer" },
           order_note: { $first: "$order_note" },
-          total_products_cost: { $first: "$total_products_cost" },
           shipping_cost: { $first: "$shipping_cost" },
           final_cost: { $first: "$final_cost" },
           order_status: { $first: "$order_status" },
@@ -378,6 +376,7 @@ export const trackOrder = async (req, res) => {
       {
         $match: {
           order_id: { $regex: orderIdPattern, $options: "i" }, // Khớp regex không phân biệt chữ hoa/thường
+          "order_buyer.phone_number": phone_number,
         },
       },
       {
@@ -435,9 +434,9 @@ export const trackOrder = async (req, res) => {
       {
         $group: {
           _id: "$_id",
+          order_id: { $first: "$order_id" },
           order_buyer: { $first: "$order_buyer" },
           order_note: { $first: "$order_note" },
-          total_products_cost: { $sum: "$order_products.total_price" },
           shipping_cost: { $first: "$shipping_cost" },
           final_cost: {
             $first: {
@@ -565,7 +564,6 @@ export const getOrderByOrderId = async (req, res) => {
           user_id: { $first: "$user_id" },
           order_buyer: { $first: "$order_buyer" },
           order_note: { $first: "$order_note" },
-          total_products_cost: { $first: "$total_products_cost" },
           shipping_cost: { $first: "$shipping_cost" },
           final_cost: { $first: "$final_cost" },
           order_status: { $first: "$order_status" },
