@@ -35,13 +35,11 @@ export const getOrders = async (req, res) => {
     }
 
     // Thêm bộ lọc theo order_id
+    const orderIdPattern = new RegExp(`^${order_id}\\..*`, "i"); // Thêm flag "i" để không phân biệt hoa thường
+
     if (order_id) {
-      query.$expr = {
-        $regexMatch: {
-          input: { $toString: "$_id" },
-          regex: order_id,
-          options: "i",
-        },
+      query.order_id = {
+        $regex: orderIdPattern, // Không cần thay đổi gì ở đây, vì pattern đã bao gồm flag "i"
       };
     }
 
