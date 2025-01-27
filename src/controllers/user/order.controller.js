@@ -646,3 +646,142 @@ export const cancelOrder = async (req, res) => {
     return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
+// [GET] /api/orders/[:hashed_id]
+export const getOrderByHashedId = async (req, res) => {
+  try {
+    const { hashedId: order_hashed_id } = req.params;
+
+    // console.log("baaaaaaaaaaaaaaaaaaa", order_hashed_id);
+    const user_id = req.user.user_id;
+
+    // Giải mã hashed ID
+    let decryptedId;
+    try {
+      decryptedId = decryptData(order_hashed_id); // Giải mã ID
+    } catch (err) {
+      console.error("Invalid or corrupted hashed order ID");
+      return error(res, "Invalid order ID");
+    }
+
+    // Kiểm tra tính hợp lệ của ID đã giải mã
+    if (!mongoose.Types.ObjectId.isValid(decryptedId)) {
+      console.error("Invalid decrypted order ID");
+      return error(res, "Invalid order ID");
+    }
+
+    const orderId = new mongoose.Types.ObjectId(decryptedId);
+
+    // Aggregation pipeline
+    const order = await Order.aggregate([
+      {
+        $match: {
+          _id: orderId,
+          user_id: new mongoose.Types.ObjectId(user_id),
+        },
+      },
+      {
+        $unwind: "$order_products",
+      },
+      {
+        $lookup: {
+          from: "products",
+          let: {
+            productId: "$order_products.product_id",
+            variantId: "$order_products.variant_id",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$productId"] },
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                product_name: 1,
+                product_imgs: { $arrayElemAt: ["$product_imgs", 0] },
+                variant: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: "$product_variants",
+                        as: "v",
+                        cond: { $eq: ["$$v._id", "$$variantId"] },
+                      },
+                    },
+                    0,
+                  ],
+                },
+              },
+            },
+          ],
+          as: "product_info",
+        },
+      },
+      {
+        $addFields: {
+          "order_products.product_name": {
+            $arrayElemAt: ["$product_info.product_name", 0],
+          },
+          "order_products.product_img": {
+            $arrayElemAt: ["$product_info.product_imgs", 0],
+          },
+          "order_products.variant_name": {
+            $arrayElemAt: ["$product_info.variant.variant_name", 0],
+          },
+          "order_products.variant_img": {
+            $arrayElemAt: ["$product_info.variant.variant_img", 0],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: "$_id",
+          order_id: { $first: "$order_id" },
+          user_id: { $first: "$user_id" },
+          order_buyer: { $first: "$order_buyer" },
+          order_note: { $first: "$order_note" },
+          shipping_cost: { $first: "$shipping_cost" },
+          final_cost: { $first: "$final_cost" },
+          order_status: { $first: "$order_status" },
+          createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
+          order_products: {
+            $push: {
+              product_id: "$order_products.product_id",
+              variant_id: "$order_products.variant_id",
+              quantity: "$order_products.quantity",
+              unit_price: "$order_products.unit_price",
+              discount_percent: "$order_products.discount_percent",
+              product_name: "$order_products.product_name",
+              product_img: "$order_products.product_img",
+              variant_name: "$order_products.variant_name",
+              variant_img: "$order_products.variant_img",
+            },
+          },
+        },
+      },
+    ]);
+
+    // Kiểm tra nếu không tìm thấy đơn hàng
+    if (!order || order.length === 0) {
+      console.error("Order not found with ID:", orderId);
+      return notFound(res, "Order not found");
+    }
+
+    // Thêm hashed ID vào kết quả trả về
+    const enrichedOrder = {
+      ...order[0],
+      order_id_hashed: order_hashed_id, // Trả lại hashed ID để khớp với đầu vào
+    };
+
+    return ok(res, { order: enrichedOrder });
+  } catch (err) {
+    console.error("Error fetching order:", err);
+    if (err.name === "CastError") {
+      return error(res, "Invalid order ID");
+    }
+    return error(res, "Internal server error");
+  }
+};

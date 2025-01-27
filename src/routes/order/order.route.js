@@ -5,6 +5,7 @@ import {
   trackOrder,
   getOrderByOrderId,
   cancelOrder,
+  getOrderByHashedId,
 } from "../../controllers/user/order.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
@@ -19,5 +20,6 @@ router.put("/cancel/:orderId", cancelOrder);
 router.use(verifyToken);
 router.get("/", getOrders);
 router.get("/:id", getOrderById);
+router.get("/rating/:hashedId", getOrderByHashedId);
 
 export default router;

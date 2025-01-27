@@ -23,6 +23,17 @@ const orderSchema = new mongoose.Schema(
         discount_percent: { type: Number, required: true },
       },
     ],
+    order_rating: [
+      {
+        product_id: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+        variant_id: { type: mongoose.Schema.Types.ObjectId },
+        rating_point: { type: Number, min: 1, max: 5, default: 5 },
+        comment: { type: String, default: "" },
+        images: [{ type: String }],
+        videos: [{ type: String }],
+        rating_date: { type: Date, default: Date.now },
+      },
+    ],
     order_note: { type: String },
     payment_method: { type: String, enum: ["cod", "onl"] },
     shipping_cost: { type: Number },
