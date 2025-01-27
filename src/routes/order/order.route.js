@@ -19,7 +19,7 @@ router.put("/cancel/:orderId", cancelOrder);
 // Các routes khác cần xác thực token
 router.use(verifyToken);
 router.get("/", getOrders);
-// router.get("/:id", getOrderById);
-router.get("/:hashedId", getOrderByHashedId);
+router.get("/:id", getOrderById);
+router.get("/rating/:hashedId", getOrderByHashedId);
 
 export default router;
