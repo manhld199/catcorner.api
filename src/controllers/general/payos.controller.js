@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import payos from "../../libs/payOS.js";
 import Order from "../../models/order.model.js";
-import { decryptData } from "../../utils/security.js";
+import { encryptData, decryptData } from "../../utils/security.js";
 import { SHIPPING_COST } from "../../utils/constants/index.js";
 
 // Hàm xử lý tạo liên kết thanh toán
@@ -37,7 +37,7 @@ export const createPaymentLink = async (req, res) => {
 
       return res.status(200).json({
         message: "Order created successfully without payment link",
-        orderId: newOrder._id,
+        orderId: encryptData(newOrder._id.toString()),
       });
     }
 
@@ -96,8 +96,13 @@ export const createPaymentLink = async (req, res) => {
         </html>
       `;
 
-      // Gửi HTML tới client
-      return res.status(200).send(htmlContent);
+      if (paymentData.mobile)
+        // Gửi HTML tới client
+        return res.status(201).send(htmlContent);
+
+      return res
+        .status(201)
+        .json({ checkoutUrl: paymentLink.checkoutUrl, message: "Payment link created" });
     }
 
     // Trường hợp phương thức thanh toán không hợp lệ
@@ -114,7 +119,7 @@ export const handlePaymentWebhook = async (req, res) => {
 
     // Validate required fields
     if (!req.body || !req.body.data || !req.body.signature) {
-      console.error("Invalid webhook data:", req.body);
+      // console.error("Invalid webhook data:", req.body);
       return res.status(400).json({ message: "Invalid webhook data" });
     }
 
@@ -147,10 +152,10 @@ export const handlePaymentWebhook = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    console.log(
-      webhookData.code == "00" ? "Order updated successfully:" : "Order update failed:",
-      order
-    );
+    // console.log(
+    //   webhookData.code == "00" ? "Order updated successfully:" : "Order update failed:",
+    //   order
+    // );
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
     console.error("Error processing webhook:", error);
@@ -194,8 +199,13 @@ export const getPaymentLink = async (req, res) => {
      </html>
    `;
 
-    // Gửi HTML tới client
-    return res.status(200).send(htmlContent);
+    if (paymentData.mobile)
+      // Gửi HTML tới client
+      return res.status(200).send(htmlContent);
+
+    return res
+      .status(200)
+      .json({ checkoutUrl: order.payment_link, message: "Get payment link successfully" });
   } catch (error) {
     console.error("Error fetching payment link:", error);
     res.status(500).json({ error: "An error occurred while fetching the payment link" });
