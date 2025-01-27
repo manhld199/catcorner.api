@@ -194,6 +194,7 @@ export const getOrders = async (req, res) => {
 
     const transformedOrders = orders.map((order) => ({
       ...order,
+      order_id_hashed: encryptData(order._id.toString()),
       order_products: order.order_products.map((product) => ({
         ...product,
         product_hashed_id: encryptData(product.product_id.toString()),
@@ -336,9 +337,12 @@ export const getOrderById = async (req, res) => {
 
     // Log kết quả
     // console.log("Order Found:", JSON.stringify(order[0], null, 2));
-
+    const enrichedOrder = {
+      ...order[0],
+      order_id_hashed: encryptData(order[0]._id.toString()), // Thêm hash ID tại đây
+    };
     // Trả về kết quả
-    return ok(res, { order: order[0] });
+    return ok(res, { order: enrichedOrder });
   } catch (err) {
     console.error("Error fetching order:", err);
     if (err.name === "CastError") {
