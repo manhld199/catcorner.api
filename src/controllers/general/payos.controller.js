@@ -119,7 +119,7 @@ export const handlePaymentWebhook = async (req, res) => {
 
     // Validate required fields
     if (!req.body || !req.body.data || !req.body.signature) {
-      console.error("Invalid webhook data:", req.body);
+      // console.error("Invalid webhook data:", req.body);
       return res.status(400).json({ message: "Invalid webhook data" });
     }
 
@@ -152,10 +152,10 @@ export const handlePaymentWebhook = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    console.log(
-      webhookData.code == "00" ? "Order updated successfully:" : "Order update failed:",
-      order
-    );
+    // console.log(
+    //   webhookData.code == "00" ? "Order updated successfully:" : "Order update failed:",
+    //   order
+    // );
     res.status(200).json({ message: "Webhook processed successfully" });
   } catch (error) {
     console.error("Error processing webhook:", error);
