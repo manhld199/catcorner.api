@@ -1,4 +1,5 @@
 import express from "express";
+import multer from "multer";
 import {
   getOrders,
   getOrderById,
@@ -6,10 +7,12 @@ import {
   getOrderByOrderId,
   cancelOrder,
   getOrderByHashedId,
+  addProductRatingWithMedia,
 } from "../../controllers/user/order.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
 const router = express.Router();
+const upload = multer();
 
 // Route không cần xác thực
 router.get("/track", trackOrder);
@@ -21,5 +24,22 @@ router.use(verifyToken);
 router.get("/", getOrders);
 router.get("/:id", getOrderById);
 router.get("/rating/:hashedId", getOrderByHashedId);
+router.post(
+  "/rating/:pid/:productId",
+  (req, res, next) => {
+    upload.fields([
+      { name: "images", maxCount: 5 },
+      { name: "videos", maxCount: 2 },
+    ])(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, message: err.message });
+      } else if (err) {
+        return res.status(500).json({ success: false, message: "File upload error" });
+      }
+      next();
+    });
+  },
+  addProductRatingWithMedia
+);
 
 export default router;

@@ -2,6 +2,8 @@ import Order from "../../models/order.model.js";
 import { ok, error, notFound, badRequest } from "../../handlers/respone.handler.js";
 import mongoose from "mongoose";
 import { decryptData, encryptData } from "../../utils/security.js";
+import cloudinary from "../../libs/cloudinary.js";
+import { Readable } from "stream";
 
 // [GET] /api/orders
 export const getOrders = async (req, res) => {
@@ -783,5 +785,136 @@ export const getOrderByHashedId = async (req, res) => {
       return error(res, "Invalid order ID");
     }
     return error(res, "Internal server error");
+  }
+};
+
+// Hàm upload tệp (ảnh hoặc video) lên Cloudinary
+const uploadFileToCloudinary = async (fileBuffer, folder, resourceType = "image") => {
+  try {
+    const uploadFromBuffer = () => {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder, resource_type: resourceType },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        Readable.from(fileBuffer).pipe(uploadStream);
+      });
+    };
+
+    const result = await uploadFromBuffer();
+    return result.secure_url;
+  } catch (error) {
+    console.error(`Error uploading ${resourceType} to Cloudinary:`, error);
+    throw new Error(`${resourceType} upload failed`);
+  }
+};
+
+export const addProductRatingWithMedia = async (req, res) => {
+  try {
+    const { pid: hashedOrderId, productId } = req.params;
+    const { rating_point, comment } = req.body;
+    const user_id = req.user?.user_id;
+    const images = req.files?.images || [];
+    const videos = req.files?.videos || [];
+
+    // console.log("Hashed Order id: ", hashedOrderId);
+    // console.log("Product id: ", productId);
+    // console.log("Rating point: ", rating_point);
+    // console.log("Comment: ", comment);
+    // console.log("User id: ", user_id);
+    // console.log("Images received: ", images);
+    // console.log("Videos received: ", videos);
+
+    // Giải mã hashedOrderId
+    let orderId;
+    try {
+      orderId = decryptData(hashedOrderId);
+    } catch (decodeError) {
+      console.error("Failed to decode hashedOrderId:", decodeError);
+      return res.status(400).json({ success: false, message: "Invalid hashed Order ID" });
+    }
+
+    // Kiểm tra tính hợp lệ của orderId và productId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      console.error("Invalid decoded orderId:", orderId);
+      return res.status(400).json({ success: false, message: "Invalid Order ID" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      console.error("Invalid productId:", productId);
+      return res.status(400).json({ success: false, message: "Invalid Product ID" });
+    }
+
+    // Kiểm tra thông tin đơn hàng
+    const order = await Order.findOne({
+      _id: orderId,
+      user_id,
+      "order_products.product_id": productId,
+    });
+
+    if (!order) {
+      console.error("Order not found for user_id:", user_id);
+      return res.status(404).json({ success: false, message: "Order or product not found" });
+    }
+
+    // Nếu chưa có order_rating, khởi tạo mảng mới
+    if (!order.order_rating) {
+      order.order_rating = [];
+    }
+
+    // Xử lý upload hình ảnh lên Cloudinary
+    const uploadedImageUrls = [];
+    for (const image of images) {
+      try {
+        const imageUrl = await uploadFileToCloudinary(
+          image.buffer,
+          "product_ratings/images",
+          "image"
+        );
+        uploadedImageUrls.push(imageUrl);
+      } catch (uploadError) {
+        console.error("Error uploading image:", uploadError);
+      }
+    }
+
+    // Xử lý upload video lên Cloudinary
+    const uploadedVideoUrls = [];
+    for (const video of videos) {
+      try {
+        const videoUrl = await uploadFileToCloudinary(
+          video.buffer,
+          "product_ratings/videos",
+          "video"
+        );
+        uploadedVideoUrls.push(videoUrl);
+      } catch (uploadError) {
+        console.error("Error uploading video:", uploadError);
+      }
+    }
+
+    // Tạo đối tượng rating
+    const rating = {
+      product_id: productId,
+      rating_point: parseInt(rating_point) || 5,
+      comment: comment || "",
+      images: uploadedImageUrls,
+      videos: uploadedVideoUrls,
+      rating_date: new Date(),
+    };
+
+    // Thêm đánh giá vào order_rating
+    order.order_rating.push(rating);
+
+    // Lưu thay đổi vào cơ sở dữ liệu
+    await order.save();
+
+    console.log("Rating added successfully for order:", orderId);
+    return res.status(200).json({ success: true, message: "Rating added successfully", rating });
+  } catch (error) {
+    console.error("Unexpected error in addProductRatingWithMedia:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
