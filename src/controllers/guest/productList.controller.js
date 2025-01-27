@@ -31,6 +31,17 @@ export const getNewestProducts = async (req, res) => {
         return minPriceVariant;
       }, null);
 
+      const highestDiscountVariant = product.product_variants
+        ? product.product_variants.reduce((maxDiscountVariant, variant) => {
+            if (
+              !maxDiscountVariant ||
+              variant.variant_discount_percent > maxDiscountVariant.variant_discount_percent
+            ) {
+              maxDiscountVariant = variant;
+            }
+            return maxDiscountVariant;
+          }, null)
+        : null;
       const variantNames = product.product_variants.map((variant) => variant.variant_name);
 
       return {
@@ -39,9 +50,11 @@ export const getNewestProducts = async (req, res) => {
         product_slug: product.product_slug,
         product_avg_rating: product.product_rating,
         product_img: product.product_imgs[0],
+        lowest_price: lowestPriceVariant ? lowestPriceVariant.discountedPrice : null,
         product_price: lowestPriceVariant ? lowestPriceVariant.variantPrice : null,
-        lowest_price: lowestPriceVariant?.discountedPrice || null,
-        highest_discount: lowestPriceVariant?.variant_discount_percent || null,
+        highest_discount: highestDiscountVariant
+          ? highestDiscountVariant.variant_discount_percent
+          : null,
         product_sold_quantity: product.product_sold_quantity,
         category_name: product.category_id?.category_name || "Unknown", // Lấy tên danh mục
         variant_names: variantNames,
@@ -81,6 +94,18 @@ export const getTopRatedProducts = async (req, res) => {
         return minPriceVariant;
       }, null);
 
+      const highestDiscountVariant = product.product_variants
+        ? product.product_variants.reduce((maxDiscountVariant, variant) => {
+            if (
+              !maxDiscountVariant ||
+              variant.variant_discount_percent > maxDiscountVariant.variant_discount_percent
+            ) {
+              maxDiscountVariant = variant;
+            }
+            return maxDiscountVariant;
+          }, null)
+        : null;
+
       const variantNames = product.product_variants.map((variant) => variant.variant_name);
 
       return {
@@ -89,9 +114,11 @@ export const getTopRatedProducts = async (req, res) => {
         product_slug: product.product_slug,
         product_avg_rating: product.product_rating,
         product_img: product.product_imgs[0],
+        lowest_price: lowestPriceVariant ? lowestPriceVariant.discountedPrice : null,
         product_price: lowestPriceVariant ? lowestPriceVariant.variantPrice : null,
-        lowest_price: lowestPriceVariant?.discountedPrice || null,
-        highest_discount: lowestPriceVariant?.variant_discount_percent || null,
+        highest_discount: highestDiscountVariant
+          ? highestDiscountVariant.variant_discount_percent
+          : null,
         product_sold_quantity: product.product_sold_quantity,
         category_name: product.category_id?.category_name || "Unknown",
         variant_names: variantNames,
@@ -139,6 +166,18 @@ export const getDiscountProducts = async (req, res) => {
         return minPriceVariant;
       }, null);
 
+      const highestDiscountVariant = product.product_variants
+        ? product.product_variants.reduce((maxDiscountVariant, variant) => {
+            if (
+              !maxDiscountVariant ||
+              variant.variant_discount_percent > maxDiscountVariant.variant_discount_percent
+            ) {
+              maxDiscountVariant = variant;
+            }
+            return maxDiscountVariant;
+          }, null)
+        : null;
+
       const variantNames = product.product_variants.map((variant) => variant.variant_name);
 
       return {
@@ -147,9 +186,11 @@ export const getDiscountProducts = async (req, res) => {
         product_slug: product.product_slug,
         product_avg_rating: product.product_rating,
         product_img: product.product_imgs[0],
+        lowest_price: lowestPriceVariant ? lowestPriceVariant.discountedPrice : null,
         product_price: lowestPriceVariant ? lowestPriceVariant.variantPrice : null,
-        lowest_price: lowestPriceVariant?.discountedPrice || null,
-        highest_discount: lowestPriceVariant?.variant_discount_percent || null,
+        highest_discount: highestDiscountVariant
+          ? highestDiscountVariant.variant_discount_percent
+          : null,
         product_sold_quantity: product.product_sold_quantity,
         category_name: product.category_id?.category_name || "Unknown",
         variant_names: variantNames,
