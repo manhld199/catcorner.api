@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import payos from "../../libs/payOS.js";
 import Order from "../../models/order.model.js";
-import { decryptData } from "../../utils/security.js";
+import { encryptData, decryptData } from "../../utils/security.js";
 import { SHIPPING_COST } from "../../utils/constants/index.js";
 
 // Hàm xử lý tạo liên kết thanh toán
@@ -37,7 +37,7 @@ export const createPaymentLink = async (req, res) => {
 
       return res.status(200).json({
         message: "Order created successfully without payment link",
-        orderId: newOrder._id,
+        orderId: encryptData(newOrder._id.toString()),
       });
     }
 
@@ -96,8 +96,13 @@ export const createPaymentLink = async (req, res) => {
         </html>
       `;
 
-      // Gửi HTML tới client
-      return res.status(200).send(htmlContent);
+      if (paymentData.mobile)
+        // Gửi HTML tới client
+        return res.status(201).send(htmlContent);
+
+      return res
+        .status(201)
+        .json({ checkoutUrl: paymentLink.checkoutUrl, message: "Payment link created" });
     }
 
     // Trường hợp phương thức thanh toán không hợp lệ
