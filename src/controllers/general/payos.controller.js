@@ -199,8 +199,13 @@ export const getPaymentLink = async (req, res) => {
      </html>
    `;
 
-    // Gửi HTML tới client
-    return res.status(200).send(htmlContent);
+    if (paymentData.mobile)
+      // Gửi HTML tới client
+      return res.status(200).send(htmlContent);
+
+    return res
+      .status(200)
+      .json({ checkoutUrl: order.payment_link, message: "Get payment link successfully" });
   } catch (error) {
     console.error("Error fetching payment link:", error);
     res.status(500).json({ error: "An error occurred while fetching the payment link" });
