@@ -64,62 +64,47 @@ export const getUserCart = async (req, res, next) => {
 // [POST] /cart
 export const getCartProducts = async (req, res, next) => {
   try {
-    // Chuẩn bị dữ liệu từ client (decrypt các product_hashed_id)
+    // Giải mã product_hashed_id từ request
     const cart = req.body.map((item) => ({
       product_id: new mongoose.Types.ObjectId(decryptData(item.product_hashed_id)),
       variant_id: new mongoose.Types.ObjectId(item.variant_id),
       quantity: item.quantity,
     }));
 
-    // Truy vấn sản phẩm từ MongoDB
-    const cartProducts = await Product.aggregate([
-      {
-        $match: {
-          _id: { $in: cart.map((item) => item.product_id) }, // Lọc theo product_id
-        },
-      },
-      {
-        $addFields: {
-          matchedVariants: {
-            $filter: {
-              input: "$product_variants", // Duyệt qua các biến thể
-              as: "variant",
-              cond: {
-                $in: ["$$variant._id", cart.map((item) => item.variant_id)], // Lọc theo variant_id
-              },
-            },
+    // Lấy tất cả sản phẩm có `product_id` trong danh sách gửi lên
+    const products = await Product.find({
+      _id: { $in: cart.map((item) => item.product_id) },
+    }).lean(); // .lean() để tăng hiệu suất (chỉ lấy dữ liệu thô)
+
+    // Xử lý dữ liệu để lấy đúng biến thể
+    const cartProducts = cart
+      .map((cartItem) => {
+        const product = products.find((p) => p._id.equals(cartItem.product_id));
+
+        if (!product) return null; // Không tìm thấy sản phẩm
+
+        // Tìm đúng variant trong `product_variants`
+        const variant = product.product_variants.find((v) => v._id.equals(cartItem.variant_id));
+
+        if (!variant) return null; // Không tìm thấy biến thể phù hợp
+
+        return {
+          product_name: product.product_name,
+          product_slug: product.product_slug,
+          product_hashed_id: encryptData(product._id.toString()),
+          product_variant: {
+            variant_name: variant.variant_name,
+            variant_slug: variant.variant_slug,
+            variant_img: variant.variant_img,
+            variant_price: variant.variant_price,
+            variant_stock_quantity: variant.variant_stock_quantity,
+            variant_discount_percent: variant.variant_discount_percent,
+            _id: variant._id,
           },
-        },
-      },
-      {
-        $match: {
-          matchedVariants: { $ne: [] }, // Chỉ giữ sản phẩm có biến thể khớp
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          product_name: 1,
-          product_slug: 1,
-          product_hashed_id: {
-            $function: {
-              body: encryptData.toString(),
-              args: ["$_id"],
-              lang: "js",
-            },
-          },
-          product_variant: { $arrayElemAt: ["$matchedVariants", 0] }, // Chỉ lấy biến thể đầu tiên
-          quantity: {
-            $getField: {
-              field: "quantity",
-              input: {
-                $arrayElemAt: [cart, { $indexOfArray: [cart.map((i) => i.product_id), "$_id"] }],
-              },
-            },
-          },
-        },
-      },
-    ]);
+          quantity: cartItem.quantity,
+        };
+      })
+      .filter(Boolean); // Lọc bỏ các giá trị null (sản phẩm không tìm thấy)
 
     if (!cartProducts.length) return notFound(res, {});
 
