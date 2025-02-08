@@ -12,12 +12,14 @@ export const createPaymentLink = async (req, res) => {
     // console.log("payyyyyyyyyy", paymentData);
 
     // Tính toán chi phí cuối cùng
-    const finalCost =
+    const finalCost = Math.round(
       paymentData.order_products.reduce(
         (acc, curr) =>
           acc + curr.quantity * ((curr.unit_price * (100 - curr.discount_percent)) / 100),
         0
-      ) + SHIPPING_COST;
+      ) + SHIPPING_COST
+    );
+    console.log("Final Cost:", finalCost);
 
     // Nếu phương thức thanh toán là COD, không tạo liên kết thanh toán
     if (paymentData.payment_method === "cod") {
