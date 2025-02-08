@@ -71,33 +71,29 @@ export const getCartProducts = async (req, res, next) => {
       quantity: item.quantity,
     }));
 
-    // console.log("carttttttttt", cart);
-
-    // // Truy xuất dữ liệu từ MongoDB
+    // Truy vấn sản phẩm từ MongoDB
     const cartProducts = await Product.aggregate([
       {
+        $match: {
+          _id: { $in: cart.map((item) => item.product_id) }, // Lọc theo product_id
+        },
+      },
+      {
         $addFields: {
-          cartData: cart, // Thêm dữ liệu giỏ hàng vào sản phẩm
-        },
-      },
-      {
-        $match: {
-          $expr: {
-            $in: ["$_id", cart.map((item) => item.product_id)], // Lọc theo product_id trong giỏ hàng
+          matchedVariants: {
+            $filter: {
+              input: "$product_variants", // Duyệt qua các biến thể
+              as: "variant",
+              cond: {
+                $in: ["$$variant._id", cart.map((item) => item.variant_id)], // Lọc theo variant_id
+              },
+            },
           },
         },
       },
       {
-        $unwind: "$cartData", // Giải nén các item trong giỏ hàng
-      },
-      {
         $match: {
-          $expr: {
-            $and: [
-              { $eq: ["$_id", "$cartData.product_id"] }, // Kiểm tra trùng khớp product_id
-              { $in: ["$cartData.variant_id", "$product_variants._id"] }, // Kiểm tra trùng khớp variant_id
-            ],
-          },
+          matchedVariants: { $ne: [] }, // Chỉ giữ sản phẩm có biến thể khớp
         },
       },
       {
@@ -105,23 +101,29 @@ export const getCartProducts = async (req, res, next) => {
           _id: 0,
           product_name: 1,
           product_slug: 1,
-          product_id: "$cartData.product_id",
-          variant_id: "$cartData.variant_id",
-          product_variants: 1,
-          quantity: "$cartData.quantity",
+          product_hashed_id: {
+            $function: {
+              body: encryptData.toString(),
+              args: ["$_id"],
+              lang: "js",
+            },
+          },
+          product_variant: { $arrayElemAt: ["$matchedVariants", 0] }, // Chỉ lấy biến thể đầu tiên
+          quantity: {
+            $getField: {
+              field: "quantity",
+              input: {
+                $arrayElemAt: [cart, { $indexOfArray: [cart.map((i) => i.product_id), "$_id"] }],
+              },
+            },
+          },
         },
       },
     ]);
 
     if (!cartProducts.length) return notFound(res, {});
 
-    // Mã hóa product_id trước khi trả về
-    const response = cartProducts.map((product) => ({
-      ...product,
-      product_hashed_id: encryptData(product.product_id.toString()),
-    }));
-
-    return ok(res, { products: response });
+    return ok(res, { products: cartProducts });
   } catch (err) {
     console.error("Error in getCartProducts:", err);
     return error(res, "Internal Server Error");
