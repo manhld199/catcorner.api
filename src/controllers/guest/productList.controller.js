@@ -412,88 +412,52 @@ export const getSearchResult = async (req, res) => {
 
 export const getOrderProducts = async (req, res) => {
   try {
+    // Giải mã product_hashed_id từ request
     const orderProducts = req.body.map((item) => ({
       product_id: new mongoose.Types.ObjectId(decryptData(item.product_hashed_id)),
       variant_id: new mongoose.Types.ObjectId(item.variant_id),
       quantity: item.quantity,
     }));
-    const products = await Product.aggregate([
-      // Unwind product_variants to process each variant as a separate document
-      {
-        $unwind: {
-          path: "$product_variants",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      // Match each product_id and variant_id pair explicitly
-      {
-        $match: {
-          $expr: {
-            $or: orderProducts.map((item) => ({
-              $and: [
-                { $eq: ["$_id", item.product_id] },
-                { $eq: ["$product_variants._id", item.variant_id] },
-              ],
-            })),
+
+    // Tìm tất cả sản phẩm có product_id trong danh sách gửi lên
+    const products = await Product.find({
+      _id: { $in: orderProducts.map((item) => item.product_id) },
+    }).lean();
+
+    // Lọc ra đúng biến thể theo variant_id
+    const orderResponse = orderProducts
+      .map((orderItem) => {
+        const product = products.find((p) => p._id.equals(orderItem.product_id));
+
+        if (!product) return null; // Nếu không tìm thấy sản phẩm, bỏ qua
+
+        const variant = product.product_variants.find((v) => v._id.equals(orderItem.variant_id));
+
+        if (!variant) return null; // Nếu không tìm thấy biến thể, bỏ qua
+
+        return {
+          product_name: product.product_name,
+          product_slug: product.product_slug,
+          product_hashed_id: encryptData(product._id.toString()),
+          product_variant: {
+            variant_name: variant.variant_name,
+            variant_slug: variant.variant_slug,
+            variant_img: variant.variant_img,
+            variant_price: variant.variant_price,
+            variant_stock_quantity: variant.variant_stock_quantity,
+            variant_discount_percent: variant.variant_discount_percent,
+            _id: variant._id,
           },
-        },
-      },
-      // Add the quantity from orderProducts by mapping each pair
-      {
-        $addFields: {
-          quantity: {
-            $reduce: {
-              input: orderProducts,
-              initialValue: 0,
-              in: {
-                $cond: {
-                  if: {
-                    $and: [
-                      { $eq: ["$$this.product_id", "$_id"] },
-                      { $eq: ["$$this.variant_id", "$product_variants._id"] },
-                    ],
-                  },
-                  then: "$$this.quantity",
-                  else: "$$value",
-                },
-              },
-            },
-          },
-        },
-      },
-      // Group by product and pick the first matching variant
-      {
-        $group: {
-          _id: "$_id",
-          product_name: { $first: "$product_name" },
-          product_slug: { $first: "$product_slug" },
-          product_variant: { $first: "$product_variants" },
-          quantity: { $first: "$quantity" },
-        },
-      },
-      // Project only the required fields
-      {
-        $project: {
-          _id: 1,
-          product_name: 1,
-          product_slug: 1,
-          product_variant: 1,
-          quantity: 1,
-        },
-      },
-    ]);
+          quantity: orderItem.quantity,
+        };
+      })
+      .filter(Boolean); // Lọc bỏ các giá trị null
 
-    if (!products.length) return notFound(res, {});
+    if (!orderResponse.length) return notFound(res, {});
 
-    const returnedProducts = products.map((product) => ({
-      ...product,
-      _id: undefined,
-      product_hashed_id: encryptData(product._id.toString()),
-    }));
-
-    return ok(res, { products: returnedProducts });
+    return ok(res, { products: orderResponse });
   } catch (err) {
-    console.log("Err: " + err);
+    console.log("Error in getOrderProducts:", err);
     return error(res, { error: err.message });
   }
 };
