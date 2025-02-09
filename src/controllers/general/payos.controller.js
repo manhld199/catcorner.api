@@ -19,7 +19,8 @@ export const createPaymentLink = async (req, res) => {
         0
       ) + SHIPPING_COST
     );
-    console.log("Final Cost:", finalCost);
+    // console.log("Final Cost:", finalCost);
+    // console.log("Payment data:", paymentData);
 
     // Nếu phương thức thanh toán là COD, không tạo liên kết thanh toán
     if (paymentData.payment_method === "cod") {
@@ -45,10 +46,15 @@ export const createPaymentLink = async (req, res) => {
 
     // Nếu phương thức thanh toán là "onl", tạo liên kết thanh toán
     if (paymentData.payment_method === "onl") {
+      const newOrderCode = Date.now() + Date.now();
       const order = {
-        orderCode: Number(paymentData.order_id.split(".")[0].slice(3)),
+        orderCode: paymentData.re_payment
+          ? newOrderCode
+          : Number(paymentData.order_id.split(".")[0].slice(3)),
         amount: finalCost,
-        description: `Đơn hàng ${(paymentData.order_id.split(".") || ["unknow"])[0]}`,
+        description: `Đơn hàng ${
+          paymentData.re_payment ? newOrderCode : (paymentData.order_id.split(".") || ["unknow"])[0]
+        }`,
         buyerName: paymentData.order_buyer.name,
         buyerPhone: paymentData.order_buyer.phone_number,
         buyerAddress: `${paymentData?.order_buyer?.address?.street || "Street"}, ${
@@ -60,6 +66,8 @@ export const createPaymentLink = async (req, res) => {
         returnUrl: paymentData.return_url,
       };
 
+      // console.log("Order data:", order);
+
       // Gọi API PayOS để tạo liên kết thanh toán
       const paymentLink = await payos.createPaymentLink(order);
 
@@ -68,20 +76,32 @@ export const createPaymentLink = async (req, res) => {
         return res.status(500).json({ error: "Failed to generate payment link" });
       }
 
-      const newOrder = new Order({
-        ...paymentData,
-        order_products: paymentData.order_products.map((product) => {
-          return {
-            ...product,
-            product_id: new mongoose.Types.ObjectId(
-              decryptData(decodeURIComponent(product.product_hashed_id))
-            ),
-          };
-        }),
-        final_cost: finalCost,
-        payment_link: paymentLink.checkoutUrl,
-      });
-      await newOrder.save();
+      if (!paymentData.re_payment) {
+        const newOrder = new Order({
+          ...paymentData,
+          order_products: paymentData.order_products.map((product) => {
+            return {
+              ...product,
+              product_id: new mongoose.Types.ObjectId(
+                decryptData(decodeURIComponent(product.product_hashed_id))
+              ),
+            };
+          }),
+          final_cost: finalCost,
+          payment_link: paymentLink.checkoutUrl,
+        });
+        await newOrder.save();
+      } else {
+        await Order.findOneAndUpdate(
+          { _id: new mongoose.Types.ObjectId(paymentData._id) },
+          {
+            order_status: "unpaid",
+            payment_link: paymentLink.checkoutUrl,
+            order_id: `DH${order.orderCode}.${paymentData.order_id.split(".")[1]}`,
+          },
+          { new: true }
+        );
+      }
 
       // Trả về chuỗi HTML chứa iframe
       const htmlContent = `
@@ -134,7 +154,7 @@ export const handlePaymentWebhook = async (req, res) => {
       return res.status(400).json({ message: "Invalid signature" });
     }
 
-    // console.log("webhookData2", webhookData);
+    console.log("webhookData2", webhookData);
 
     if (!webhookData) return res.status(400).json({ message: "Invalid webhook data" });
 
@@ -169,6 +189,7 @@ export const getPaymentLink = async (req, res) => {
   try {
     // Lấy orderCode từ yêu cầu
     const { orderCode } = req.params;
+    const { mobile } = req.query;
 
     if (!orderCode) {
       return res.status(400).json({ error: "Order code is required" });
@@ -201,7 +222,7 @@ export const getPaymentLink = async (req, res) => {
      </html>
    `;
 
-    if (paymentData.mobile)
+    if (mobile)
       // Gửi HTML tới client
       return res.status(200).send(htmlContent);
 

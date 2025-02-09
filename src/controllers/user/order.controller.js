@@ -599,10 +599,12 @@ export const getOrderByOrderId = async (req, res) => {
       });
     }
 
+    const returnOrder = { ...order[0], order_id_hashed: encryptData(order[0]._id.toString()) };
+
     // Trả về kết quả
     return res.status(200).json({
       success: true,
-      data: { order: order[0] },
+      data: { order: returnOrder },
     });
   } catch (err) {
     console.error("Error fetching order by order_id:", err);
@@ -617,20 +619,23 @@ export const getOrderByOrderId = async (req, res) => {
 export const cancelOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    console.log("Order ID from params:", orderId); // Kiểm tra giá trị của orderId
+    // console.log("Order ID from params:", orderId); // Kiểm tra giá trị của orderId
 
     if (!orderId) {
-      return res.status(400).json({ success: false, message: "Order ID is required." });
+      return badRequest(res, { success: false, message: "Order ID is required." });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
-      return res.status(400).json({ success: false, message: "Invalid order ID." });
+    if (!mongoose.Types.ObjectId.isValid(orderId) && !orderId.startsWith("DH")) {
+      return badRequest(res, { success: false, message: "Invalid order ID." });
     }
 
-    const order = await Order.findOne({ _id: orderId });
+    const orderMatch = orderId.startsWith("DH")
+      ? { order_id: { $regex: orderId, $options: "i" } }
+      : { _id: orderId };
+    const order = await Order.findOne(orderMatch);
 
     if (!order) {
-      return res.status(404).json({
+      return notFound(res, {
         success: false,
         message: "Order not found or you don't have permission to update this order.",
       });
@@ -638,14 +643,14 @@ export const cancelOrder = async (req, res) => {
 
     // Cập nhật trạng thái đơn hàng thành "Đã hủy"
     await Order.updateOne(
-      { _id: orderId },
-      { $set: { order_status: "cancel" } } // Cập nhật trạng thái thành "Đã hủy"
+      orderMatch,
+      { $set: { order_status: "canceled" } } // Cập nhật trạng thái thành "Đã hủy"
     );
 
-    return res.status(200).json({ success: true, message: "Order status updated to 'canceled'." });
+    return ok(res, { success: true, message: "Order status updated to 'canceled'." });
   } catch (err) {
     console.error("Error updating order status:", err);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    return error(res, { success: false, message: "Internal server error" });
   }
 };
 
