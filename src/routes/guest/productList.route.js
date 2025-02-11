@@ -8,6 +8,7 @@ import {
   getSearchResult,
   getProductsByCategory,
   getProductsGroupedByCategory,
+  getCategoriesWithRandomProducts,
 } from "../../controllers/guest/productList.controller.js";
 
 const router = express.Router();
@@ -34,5 +35,6 @@ router.get("/search", encodeURI, getSearchResult);
 router.get("/getProductsByCategory/:categoryId", getProductsByCategory);
 router.post("/getOrderProducts", getOrderProducts);
 router.get("/getProductsGroupedByCategory", getProductsGroupedByCategory);
+router.get("/byCategory", getCategoriesWithRandomProducts);
 
 export default router;

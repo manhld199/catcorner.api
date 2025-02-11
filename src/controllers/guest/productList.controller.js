@@ -566,3 +566,98 @@ export const getProductsGroupedByCategory = async (req, res) => {
     });
   }
 };
+
+// [GET] /api/guest/product/byCategory
+export const getCategoriesWithRandomProducts = async (req, res, next) => {
+  try {
+    console.log("API getCategoriesWithRandomProducts được gọi!");
+
+    // Lấy danh sách danh mục kèm theo hình ảnh
+    const categories = await Category.find({}, "_id category_name category_img");
+    console.log("Danh mục lấy được:", categories);
+
+    if (!categories || categories.length === 0) {
+      console.log("Không tìm thấy danh mục nào!");
+      return error(res, "Không tìm thấy danh mục nào.");
+    }
+
+    // Lấy sản phẩm ngẫu nhiên cho mỗi danh mục
+    const categoryWithProducts = await Promise.all(
+      categories.map(async (category) => {
+        try {
+          // Chuyển ObjectId nếu cần
+          const categoryId = mongoose.isValidObjectId(category._id)
+            ? category._id
+            : new mongoose.Types.ObjectId(category._id);
+
+          console.log(
+            `Đang lấy sản phẩm cho danh mục ${category.category_name} (ID: ${categoryId})`
+          );
+
+          // Truy vấn sản phẩm
+          const products = await Product.aggregate([
+            { $match: { category_id: categoryId } },
+            { $sample: { size: Math.floor(Math.random() * 5) + 2 } }, // Lấy từ 2-4 sản phẩm
+            {
+              $project: {
+                _id: 1,
+                product_name: 1,
+                product_slug: 1,
+                product_imgs: { $ifNull: [{ $arrayElemAt: ["$product_imgs", 0] }, ""] }, // Lấy ảnh đầu tiên
+                product_avg_rating: 1,
+                product_short_description: 1,
+                product_sold_quantity: 1,
+                highest_discount: {
+                  $ifNull: [{ $max: "$product_variants.variant_discount_percent" }, 0],
+                },
+                product_variants: {
+                  $map: {
+                    input: "$product_variants",
+                    as: "variant",
+                    in: {
+                      variant_name: "$$variant.variant_name",
+                      variant_price: "$$variant.variant_price",
+                      variant_discount_percent: "$$variant.variant_discount_percent",
+                      discounted_price: {
+                        $subtract: [
+                          "$$variant.variant_price",
+                          {
+                            $multiply: [
+                              "$$variant.variant_price",
+                              { $divide: ["$$variant.variant_discount_percent", 100] },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ]);
+
+          console.log(`Sản phẩm lấy được cho danh mục ${category.category_name}:`, products);
+
+          return {
+            category_name: category.category_name,
+            category_img: category.category_img, // Lấy hình ảnh danh mục
+            products,
+          };
+        } catch (error) {
+          console.error(`Lỗi khi xử lý danh mục ${category.category_name}:`, error);
+          return {
+            category_name: category.category_name,
+            category_img: category.category_img,
+            products: [],
+          };
+        }
+      })
+    );
+
+    console.log("Kết quả trả về:", categoryWithProducts);
+    return ok(res, { categories: categoryWithProducts });
+  } catch (err) {
+    console.error("Lỗi khi lấy danh mục và sản phẩm:", err);
+    return error(res, "Lỗi khi lấy danh mục và sản phẩm.");
+  }
+};
