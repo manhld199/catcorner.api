@@ -8,6 +8,7 @@ import {
   cancelOrder,
   getOrderByHashedId,
   addProductRatingWithMedia,
+  getOrderRatings,
 } from "../../controllers/user/order.controller.js";
 import { verifyToken } from "../../middlewares/auth.middleware.js";
 
@@ -41,5 +42,6 @@ router.post(
   },
   addProductRatingWithMedia
 );
+router.get("/rating/getContent/:hashedId", getOrderRatings);
 
 export default router;

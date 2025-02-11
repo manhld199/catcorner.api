@@ -300,3 +300,82 @@ export const getRecommend = async (req, res, next) => {
     return error(res, err.message);
   }
 };
+
+// [GET] /api/guest/product/byCategory
+export const getCategoriesWithRandomProducts = async (req, res, next) => {
+  try {
+    console.log("API getCategoriesWithRandomProducts được gọi!");
+
+    const categories = await Category.find({}, "_id category_name");
+    console.log("Danh mục lấy được:", categories);
+
+    if (!categories || categories.length === 0) {
+      console.log("Không tìm thấy danh mục nào!");
+      return error(res, "Không tìm thấy danh mục nào.");
+    }
+
+    const categoryWithProducts = await Promise.all(
+      categories.map(async (category) => {
+        try {
+          const categoryId = new mongoose.Types.ObjectId(category._id);
+          console.log(`Đang xử lý danh mục: ${category.category_name} (ID: ${categoryId})`);
+
+          const products = await Product.aggregate([
+            { $match: { category_id: categoryId } },
+            { $sample: { size: Math.floor(Math.random() * 3) + 2 } },
+            {
+              $project: {
+                _id: 1,
+                product_name: 1,
+                product_slug: 1,
+                product_imgs: { $arrayElemAt: ["$product_imgs", 0] },
+                product_avg_rating: 1,
+                product_short_description: 1,
+                highest_discount: { $max: "$product_variants.variant_discount_percent" },
+                product_variants: {
+                  $map: {
+                    input: "$product_variants",
+                    as: "variant",
+                    in: {
+                      variant_name: "$$variant.variant_name",
+                      variant_slug: "$$variant.variant_slug",
+                      variant_price: "$$variant.variant_price",
+                      variant_discount_percent: "$$variant.variant_discount_percent",
+                      discounted_price: {
+                        $subtract: [
+                          "$$variant.variant_price",
+                          {
+                            $multiply: [
+                              "$$variant.variant_price",
+                              { $divide: ["$$variant.variant_discount_percent", 100] },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ]);
+
+          console.log(`Sản phẩm lấy được cho danh mục ${category.category_name}:`, products);
+
+          return {
+            category_name: category.category_name,
+            products,
+          };
+        } catch (error) {
+          console.error(`Lỗi khi xử lý danh mục ${category.category_name}:`, error);
+          return { category_name: category.category_name, products: [] };
+        }
+      })
+    );
+
+    console.log("Kết quả trả về:", categoryWithProducts);
+    return ok(res, { categories: categoryWithProducts });
+  } catch (err) {
+    console.error("Lỗi khi lấy danh mục và sản phẩm:", err);
+    return error(res, "Lỗi khi lấy danh mục và sản phẩm.");
+  }
+};

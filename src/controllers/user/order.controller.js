@@ -812,6 +812,7 @@ const uploadFileToCloudinary = async (fileBuffer, folder, resourceType = "image"
   }
 };
 
+// [POST] "/api/orders/rating/:pid/:productId"
 export const addProductRatingWithMedia = async (req, res) => {
   try {
     const { pid: hashedOrderId, productId } = req.params;
@@ -916,5 +917,62 @@ export const addProductRatingWithMedia = async (req, res) => {
   } catch (error) {
     console.error("Unexpected error in addProductRatingWithMedia:", error);
     return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// [GET] "/api/orders/rating/getContent"
+export const getOrderRatings = async (req, res) => {
+  try {
+    const { hashedId } = req.params; // Lấy `hashedId` từ URL params
+    const user_id = req.user?.user_id; // Xác định người dùng từ middleware xác thực
+
+    // Giải mã hashedId để lấy orderId
+    let orderId;
+    try {
+      orderId = decryptData(hashedId); // Sử dụng hàm decryptData để giải mã hashedId
+      // console.log("Decrypted Order ID:", orderId);
+    } catch (error) {
+      console.error("Failed to decrypt hashedId:", error);
+      return res.status(400).json({ success: false, message: "Invalid hashed Order ID" });
+    }
+
+    // Kiểm tra tính hợp lệ của orderId
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      console.error("Invalid decrypted Order ID:", orderId);
+      return res.status(400).json({ success: false, message: "Invalid Order ID" });
+    }
+
+    // Tìm đơn hàng
+    const order = await Order.findOne({
+      _id: orderId,
+      user_id,
+    });
+
+    if (!order) {
+      console.error("Order not found for user_id:", user_id);
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // Kiểm tra xem order_rating có tồn tại hay không
+    if (!order.order_rating || order.order_rating.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No ratings found for this order",
+        ratings: [],
+      });
+    }
+
+    // Trả về danh sách đánh giá
+    return res.status(200).json({
+      success: true,
+      message: "Ratings retrieved successfully",
+      ratings: order.order_rating,
+    });
+  } catch (error) {
+    console.error("Error fetching order ratings:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 };
